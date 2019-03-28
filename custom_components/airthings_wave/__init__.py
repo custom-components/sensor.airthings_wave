@@ -1,0 +1,1 @@
+"""The Airthings Wave component."""
