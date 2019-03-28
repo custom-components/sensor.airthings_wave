@@ -10,7 +10,8 @@ code to build this component was inspired by these projects:
 
 The aforementioned `radonwave` project is especially useful as it describes
 many of the BLE characteristics specific to this product and good has
-trouble-shooting tips
+trouble-shooting tips. The script provided is also very useful in determining the MAC address of your AW device. See here: https://github.com/marcelm/radonwave/issues/3
+
 
 ## Getting started
 
@@ -63,17 +64,30 @@ first.
 
 * Component returns metric values only (for now)
 https://github.com/custom-components/sensor.airthings_wave/issues/1
+
 * Values only appear after first scan_interval (default 1 minute) has passed
 and will remain as `unknown` until then
 https://github.com/custom-components/sensor.airthings_wave/issues/2
+
 * Component keeps a persistent connection thread to the BLE dongle which may
 block phone app from connecting to the AW device
+
 * Not yet compatible with [custom_updater](https://github.com/custom-components/custom_updater) and [tracker-card](https://github.com/custom-cards/tracker-card)
+
 * Not yet able to specify the `monitored_conditions` configuration
+
+* No translations available yet
 
 
 ## Hardware requirements
 
 * An Airthings Wave
+
 * A Bluetooth adapter that supports Bluetooth Low Energy (BLE). such as this
 one: https://www.amazon.com/dp/B01N5MGEUS/ref=cm_sw_r_tw_dp_U_x_ObdNCb03P7QZJ
+
+## Other Resources
+* https://github.com/marcelm/radonwave/issues/1
+* https://community.home-assistant.io/t/radoneye-ble-interface/94962
+* https://support.airthings.com/hc/en-us/articles/115002910089-How-to-respond-to-your-radon-levels?mobile_site=true
+* https://community.home-assistant.io/t/converting-sensor-measurement-units/98807
