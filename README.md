@@ -53,6 +53,17 @@ detector.
 Make sure you install the latest firmware on the device using the official app
 first.
 
+## Known Issues
+
+* Component returns metric values (for now)
+https://github.com/custom-components/sensor.airthings_wave/issues/1
+* Values only appear after first scan_interval (default 1 minute) has passed
+and will remain as `unknown` until then
+https://github.com/custom-components/sensor.airthings_wave/issues/2
+* Component keeps a persistent connection thread to the BLE dongle which may
+block phone app from connecting to the AW device
+
+
 ## Hardware requirements
 
 * An Airthings Wave
