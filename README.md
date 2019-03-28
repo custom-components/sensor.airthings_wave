@@ -1,7 +1,7 @@
 # sensor.airthings_wave
 hassio support for Airthings Wave BLE environmental radon sensor.
 
-![ScreenShot][ScreenShot.png]
+![ScreenShot](ScreenShot.png)
 
 Much of The
 code to build this component was inspired by these projects:
