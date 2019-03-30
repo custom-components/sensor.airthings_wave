@@ -24,13 +24,14 @@ import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  CONF_NAME, CONF_SCAN_INTERVAL,
-                                 CONF_UNIT_SYSTEM,
-                                 DEVICE_CLASS_HUMIDITY,
+                                 CONF_UNIT_SYSTEM, CONF_UNIT_SYSTEM_IMPERIAL,
+                                 CONF_UNIT_SYSTEM_METRIC, TEMPERATURE,
+                                 TEMP_CELSIUS, DEVICE_CLASS_HUMIDITY,
                                  DEVICE_CLASS_ILLUMINANCE,
                                  DEVICE_CLASS_TEMPERATURE,
                                  DEVICE_CLASS_TIMESTAMP,
                                  EVENT_HOMEASSISTANT_STOP, ILLUMINANCE,
-                                 STATE_UNKNOWN, TEMP_CELSIUS, TEMPERATURE)
+                                 STATE_UNKNOWN)
 from homeassistant.helpers.entity import Entity
 
 REQUIREMENTS = ['pygatt[GATTTOOL]==3.2.0']
@@ -41,7 +42,6 @@ CONNECT_LOCK = threading.Lock()
 CONNECT_TIMEOUT = 30
 SCAN_INTERVAL = timedelta(seconds=60)
 
-
 ATTR_DEVICE_DATE_TIME = 'device_date_time'
 ATTR_RADON_LEVEL = 'radon_level'
 DEVICE_CLASS_RADON='radon'
@@ -50,6 +50,9 @@ ILLUMINANCE_LUX = 'lx'
 PERCENT = '%'
 SPEED_METRIC_UNITS = 'm/s2'
 VOLUME_BECQUEREL = 'Bq/m3'
+VOLUME_PICOCURIE = 'pCi/L'
+
+BQ_TO_PCI_MULTIPLIER = 0.037
 
 VERY_LOW = 'very low'
 LOW = 'low'
@@ -63,7 +66,7 @@ CHAR_UUID_RADON_1DAYAVG = 'b42e01aa-ade7-11e4-89d3-123b93f75cba'
 CHAR_UUID_RADON_LONG_TERM_AVG = 'b42e0a4c-ade7-11e4-89d3-123b93f75cba'
 CHAR_UUID_ILLUMINANCE_ACCELEROMETER = 'b42e1348-ade7-11e4-89d3-123b93f75cba'
 
-UNIT_SYSTEMS = ['english', 'metric']
+UNIT_SYSTEMS = [CONF_UNIT_SYSTEM_IMPERIAL, CONF_UNIT_SYSTEM_METRIC]
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_MAC): cv.string,
@@ -96,16 +99,24 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     name = config.get(CONF_NAME)
     mac = config.get(CONF_MAC)
     scan_interval = config.get(CONF_SCAN_INTERVAL)
+    unit_system = config.get(CONF_UNIT_SYSTEM)
 
     _LOGGER.debug("Setting up...")
+
+    if CONF_UNIT_SYSTEM in config:
+        unit_system = config[CONF_UNIT_SYSTEM]
+    elif hass.config.units.is_metric:
+        unit_system = UNIT_SYSTEMS[1]
+    else:
+        unit_system = UNIT_SYSTEMS[0]
 
     mon = Monitor(hass, mac, name, scan_interval)
     add_entities([AirthingsTemperature(name + " Temperature", mon)])
     add_entities([AirthingsHumidity(name + " Humidity", mon)])
     add_entities([AirthingsRadon(name + " Radon 1 Day Average",
-        mon, 'radon_1day_avg')])
+        mon, 'radon_1day_avg', unit_system)])
     add_entities([AirthingsRadon(name + " Radon Long Term Average",
-        mon, 'radon_longterm_avg')])
+        mon, 'radon_longterm_avg', unit_system)])
     add_entities([AirthingsIlluminance(name + " Illuminance", mon)])
     add_entities([AirthingsAccel(name + " Acceleration", mon)])
 
@@ -182,12 +193,13 @@ class AirthingsTemperature(Entity):
 class AirthingsRadon(Entity):
     """Representation of a Airthings radon sensor."""
 
-    def __init__(self, name, mon, subclass):
+    def __init__(self, name, mon, subclass, unit_system):
         """Initialize a sensor."""
         self.mon = mon
         self._subclass = subclass
         self._name = name
         self.radon_level = STATE_UNKNOWN
+        self.unit_system = unit_system
 
     @property
     def name(self):
@@ -197,12 +209,27 @@ class AirthingsRadon(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.mon.data[self._subclass]
+        try:
+            if self.unit_system == CONF_UNIT_SYSTEM_IMPERIAL:
+                self.converted_radon_data = round(
+                    float(self.mon.data[self._subclass]) *
+                        BQ_TO_PCI_MULTIPLIER, 2)
+            else:
+                self.converted_radon_data = self.mon.data[self._subclass]
+
+        except Exception as ex:
+            _LOGGER.warn("Radon data is : got an exception: %s", ex)
+            self.converted_radon_data = self.mon.data[self._subclass]
+
+        return self.converted_radon_data
 
     @property
     def unit_of_measurement(self):
         """Return the unit the value is expressed in."""
-        return VOLUME_BECQUEREL
+        if (self.unit_system == CONF_UNIT_SYSTEM_IMPERIAL) :
+            return VOLUME_PICOCURIE
+        else :
+            return VOLUME_BECQUEREL
 
     @property
     def device_state_attributes(self):
