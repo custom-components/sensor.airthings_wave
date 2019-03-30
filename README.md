@@ -63,9 +63,6 @@ first.
 
 ## Known Issues
 
-* Component returns metric values only (for now)
-https://github.com/custom-components/sensor.airthings_wave/issues/1
-
 * Values only appear after first scan_interval (default 1 minute) has passed
 and will remain as `unknown` until then
 https://github.com/custom-components/sensor.airthings_wave/issues/2
