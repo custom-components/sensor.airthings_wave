@@ -1,4 +1,4 @@
 [
-  "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave/master/custom_components/sensor.airthings_wave/__init__.py",
-  "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave/master/custom_components/sensor.airthings_wave/sensor.py"
+  "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave/master/custom_components/airthings_wave/__init__.py",
+  "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave/master/custom_components/airthings_wave/sensor.py"
 ]

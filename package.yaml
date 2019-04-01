@@ -4,8 +4,8 @@ author:
   name: Marty Tremblay
 description: ☢ Airthings Wave component
 files:
-- custom_components/sensor.airthings_wave/__init__.py
-- custom_components/sensor.airthings_wave/sensor.py
+- custom_components/airthings_wave/__init__.py
+- custom_components/airthings_wave/sensor.py
 keywords:
 - radon
 - gas
