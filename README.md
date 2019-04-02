@@ -13,6 +13,16 @@ trouble-shooting tips. The script provided is also very useful in determining
 the MAC address of your AW device. See here:
 https://github.com/marcelm/radonwave/issues/3
 
+[![GitHub Release][releases-shield]][releases]
+[![GitHub Activity][commits-shield]][commits]
+[![custom_updater][customupdaterbadge]][customupdater]
+[![License][license-shield]](LICENSE.md)
+
+![Project Maintenance][maintenance-shield]
+[![BuyMeCoffee][buymecoffeebadge]][buymecoffee]
+
+[![Discord][discord-shield]][discord]
+[![Community Forum][forum-shield]][forum]
 
 ## Getting started
 
