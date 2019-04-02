@@ -1,13 +1,4 @@
-{
-    "airthings_wave": {
-        "version": "1.0.0",
-        "local_location": "/custom_components/airthings_wave/__init__.py",
-        "remote_location": "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave/master/custom_components/airthings_wave/__init__.py",
-        "visit_repo": "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave",
-        "changelog": "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave",
-        "resources": [
-          "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave/master/custom_components/airthings_wave/__init__.py",
-          "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave/master/custom_components/airthings_wave/sensor.py"
-        ]
-    }
-}
+[
+  "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave/master/custom_components/airthings_wave/__init__.py",
+  "https://raw.githubusercontent.com/custom-components/sensor.airthings_wave/master/custom_components/airthings_wave/sensor.py"
+]
