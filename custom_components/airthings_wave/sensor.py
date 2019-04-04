@@ -40,7 +40,7 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_NAME = 'Airthings Wave'
 CONNECT_LOCK = threading.Lock()
 CONNECT_TIMEOUT = 30
-SCAN_INTERVAL = timedelta(seconds=60)
+SCAN_INTERVAL = timedelta(seconds=300)
 
 ATTR_DEVICE_DATE_TIME = 'device_date_time'
 ATTR_RADON_LEVEL = 'radon_level'
@@ -54,10 +54,25 @@ VOLUME_PICOCURIE = 'pCi/L'
 
 BQ_TO_PCI_MULTIPLIER = 0.037
 
-VERY_LOW = 'very low'
-LOW = 'low'
-MODERATE = 'moderate'
-HIGH = 'high'
+"""
+0 - 49 Bq/m3  (0 - 1.3 pCi/L):
+No action necessary.
+
+50 - 99 Bq/m3 (1.4 - 2.6 pCi/L):
+Experiment with ventilation and sealing cracks to reduce levels.
+
+100 Bq/m3 - 299 Bq/m3 (2.7 - 8 pCi/L):
+Keep measuring. If levels are maintained for more than 3 months,
+contact a professional radon mitigator.
+
+300 Bq/m3 (8.1 pCi/L) and up:
+Keep measuring. If levels are maintained for more than 1 month,
+contact a professional radon mitigator.
+"""
+VERY_LOW = [0, 49, 'very low']
+LOW = [50, 99, 'low']
+MODERATE = [100, 299, 'moderate']
+HIGH = [300, None, 'high']
 
 CHAR_UUID_DATETIME = UUID(0x2A08)
 CHAR_UUID_TEMPERATURE = UUID(0x2A6E)
@@ -235,31 +250,15 @@ class AirthingsRadon(Entity):
     def device_state_attributes(self):
         """Return the state attributes of the sensor."""
 
-        """
-        0 - 49 Bq/m3  (0 - 1.3 pCi/L):
-        No action necessary.
-
-        49 - 99 Bq/m3 (1.4 - 2.6 pCi/L):
-        Experiment with ventilation and sealing cracks to reduce levels.
-
-        100 Bq/m3 - 299 Bq/m3 (2.7 - 8 pCi/L):
-        Keep measuring. If levels are maintained for more than 3 months,
-        contact a professional radon mitigator.
-
-        300 Bq/m3 (8.1 pCi/L) and up:
-        Keep measuring. If levels are maintained for more than 1 month,
-        contact a professional radon mitigator.
-        """
-
         try:
-            if 0 <= float(self.mon.data[self._subclass]) <= 49:
-                self.radon_level = VERY_LOW
-            elif 50 <= float(self.mon.data[self._subclass]) <= 99:
-                self.radon_level = LOW
-            elif 100 <= float(self.mon.data[self._subclass]) <= 299:
-                self.radon_level = MODERATE
+            if VERY_LOW[0] <= float(self.mon.data[self._subclass]) <= VERY_LOW[1]:
+                self.radon_level = VERY_LOW[2]
+            elif LOW[0] <= float(self.mon.data[self._subclass]) <= LOW[1]:
+                self.radon_level = LOW[2]
+            elif MODERATE[0] <= float(self.mon.data[self._subclass]) <= MODERATE[1]:
+                self.radon_level = MODERATE[2]
             else:
-                self.radon_level = HIGH
+                self.radon_level = HIGH[2]
         except Exception as ex:
             _LOGGER.warn("Radon level is : got an exception: %s", ex)
             self.radon_level = STATE_UNKNOWN
@@ -361,39 +360,38 @@ class Monitor(threading.Thread):
             BLEError, NotConnectedError, NotificationTimeout)
 
         adapter = pygatt.backends.GATTToolBackend()
-
-        while True:
-            try:
+        try:
+            while self.keep_going:
                 _LOGGER.debug("Connecting to %s", self.name)
+
                 # We need concurrent connect, so lets not reset the device
                 adapter.start(reset_on_start=False)
-                # Seems only one connection can be initiated at a time
-                with CONNECT_LOCK:
-                    device = adapter.connect(self.mac, CONNECT_TIMEOUT)
+                device = adapter.connect(self.mac, CONNECT_TIMEOUT)
 
-                # Magic: writing this makes device happy
-                device.char_write_handle(0x1b, bytearray([255]), False)
-                while self.keep_going:
-                    for s in sensors:
-                        val = struct.unpack(s.format_type,
-                            device.char_read(s.uuid, timeout=CONNECT_TIMEOUT))
-                        _LOGGER.debug("Sensor %s: %s", s.name, val)
-                        if s.name == 'date_time':
-                            val = str(datetime(val[0], val[1], val[2], val[3],
-                                val[4], val[5]).isoformat())
-                            self.data[s.name] = val
-                        elif s.name == 'illuminance_accelerometer':
-                            self.data['illuminance'] = str(val[0] * s.scale)
-                            self.data['accelerometer'] = str(val[1] * s.scale)
-                        else:
-                            self.data[s.name] = str(round(val[0] * s.scale, 1))
+                # Give the adaptor a breather
+                self.event.wait(1)
+                for s in sensors:
+                    val = struct.unpack(s.format_type,
+                        device.char_read(s.uuid, timeout=CONNECT_TIMEOUT))
+                    _LOGGER.debug("Sensor %s: %s", s.name, val)
 
-                    self.event.wait(self.scan_interval.total_seconds())
-                break
-            except (BLEError, NotConnectedError, NotificationTimeout) as ex:
-                _LOGGER.error("Exception: %s ", str(ex))
-            finally:
+                    if s.name == 'date_time':
+                        val = str(datetime(val[0], val[1], val[2], val[3],
+                            val[4], val[5]).isoformat())
+                        self.data[s.name] = val
+                    elif s.name == 'illuminance_accelerometer':
+                        self.data['illuminance'] = str(val[0] * s.scale)
+                        self.data['accelerometer'] = str(val[1] * s.scale)
+                    else:
+                        self.data[s.name] = str(round(val[0] * s.scale, 1))
+
                 adapter.stop()
+                self.event.wait(self.scan_interval.total_seconds())
+
+        except (BLEError, NotConnectedError, NotificationTimeout) as ex:
+            _LOGGER.error("Exception: %s ", str(ex))
+        finally:
+            adapter.stop()
 
     def terminate(self):
         """Signal runner to stop and join thread."""

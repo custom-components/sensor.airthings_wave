@@ -56,7 +56,7 @@ sensor:
 
 **scan_interval**
 
-  (string)(Optional) The interval between polls. Defaults to 1 minute
+  (string)(Optional) The interval between polls. Defaults to 300 seconds (5 minutes)
 
 ## Limitations
 
@@ -73,12 +73,11 @@ first.
 
 ## Known Issues
 
+* Note yet compatible with Airthings Wave Plus
+
 * Values only appear after first scan_interval (default 1 minute) has passed
 and will remain as `unknown` until then
 https://github.com/custom-components/sensor.airthings_wave/issues/2
-
-* Component keeps a persistent connection thread to the BLE dongle which may
-block phone app from connecting to the AW device
 
 * Not yet compatible with
 [custom_updater](https://github.com/custom-components/custom_updater) and
