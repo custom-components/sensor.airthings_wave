@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v0.2.0 (2019-03-29)
+## v0.3.0 (2019-04-04)
 
 - Fixed low-frequency updates
 - Changed default updates to be from 1 minute to 5 minutes
