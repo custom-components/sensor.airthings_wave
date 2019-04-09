@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.4.0 (2019-04-08)
+
+- Upgraded to pygatt 4.0.3 to resolve stability issues
+
 ## v0.3.0 (2019-04-04)
 
 - Fixed low-frequency updates

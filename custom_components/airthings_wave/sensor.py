@@ -34,7 +34,7 @@ from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  STATE_UNKNOWN)
 from homeassistant.helpers.entity import Entity
 
-REQUIREMENTS = ['pygatt[GATTTOOL]==3.2.0']
+REQUIREMENTS = ['pygatt[GATTTOOL]==4.0.3']
 
 _LOGGER = logging.getLogger(__name__)
 DEFAULT_NAME = 'Airthings Wave'
