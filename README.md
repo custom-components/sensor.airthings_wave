@@ -75,7 +75,7 @@ first.
 
 * Note yet compatible with Airthings Wave Plus
 
-* Values only appear after first scan_interval (default 1 minute) has passed
+* Values only appear after first scan_interval (default 5 minutes) has passed
 and will remain as `unknown` until then
 https://github.com/custom-components/sensor.airthings_wave/issues/2
 
