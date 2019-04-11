@@ -74,9 +74,9 @@ first.
 
 ## Known Issues
 
-* Note yet compatible with Airthings Wave Plus
+* Note yet compatible with Airthings Wave __Plus__
 
-* Values only appear after first scan_interval (default 1 minute) has passed
+* Values only appear after first scan_interval (default 5 minutes) has passed
 and will remain as `unknown` until then
 https://github.com/custom-components/sensor.airthings_wave/issues/2
 
@@ -93,7 +93,7 @@ https://github.com/custom-components/sensor.airthings_wave/issues/2
 
 * An Airthings Wave
 
-* A Bluetooth adapter that supports Bluetooth Low Energy (BLE). such as this
+* A Raspberry Pi 3 with built-in Bluetooth __OR__ a Bluetooth adapter that supports Bluetooth Low Energy (BLE). such as this
 one: https://www.amazon.com/dp/B01N5MGEUS/ref=cm_sw_r_tw_dp_U_x_ObdNCb03P7QZJ
 
 ## Other Resources
