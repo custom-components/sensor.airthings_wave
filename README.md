@@ -104,9 +104,9 @@ one: https://www.amazon.com/dp/B01N5MGEUS/ref=cm_sw_r_tw_dp_U_x_ObdNCb03P7QZJ
 * http://certi.us/Downloads/Canada_Meas_BW.pdf
 
 [airthings_wave]: https://github.com/custom-components/sensor.airthings_wave
-[buymecoffee]: buymeacoff.ee/3ZLzU76DI
+[buymecoffee]: https://buymeacoff.ee/MartyTremblay
 [buymecoffeebadge]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
-[buymebeer]: buymeacoff.ee/3ZLzU76DI
+[buymebeer]: https://paypal.me/MartyTremblay
 [buymebeerbadge]: https://img.shields.io/badge/buy%20me%20a%20beer-donate-yellow.svg?style=for-the-badge
 [commits-shield]: https://img.shields.io/github/commit-activity/y/custom-components/sensor.airthings_wave.svg?style=for-the-badge
 [commits]: https://github.com/custom-components/sensor.airthings_wave/commits/master
