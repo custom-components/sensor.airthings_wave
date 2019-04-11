@@ -1,4 +1,16 @@
 # sensor.airthings_wave
+[![GitHub Release][releases-shield]][releases]
+[![GitHub Activity][commits-shield]][commits]
+[![custom_updater][customupdaterbadge]][customupdater]
+[![License][license-shield]](LICENSE.md)
+
+![Project Maintenance][maintenance-shield]
+[![BuyMeCoffee][buymecoffeebadge]][buymecoffee]
+[![BuyMeCoffee][buymebeerbadge]][buymebeer]
+
+[![Discord][discord-shield]][discord]
+[![Community Forum][forum-shield]][forum]
+
 hassio support for Airthings Wave BLE environmental radon sensor.
 
 ![ScreenShot](ScreenShot.png)
@@ -12,17 +24,6 @@ many of the BLE characteristics specific to this product and has good
 trouble-shooting tips. The script provided is also very useful in determining
 the MAC address of your AW device. See here:
 https://github.com/marcelm/radonwave/issues/3
-
-[![GitHub Release][releases-shield]][releases]
-[![GitHub Activity][commits-shield]][commits]
-[![custom_updater][customupdaterbadge]][customupdater]
-[![License][license-shield]](LICENSE.md)
-
-![Project Maintenance][maintenance-shield]
-[![BuyMeCoffee][buymecoffeebadge]][buymecoffee]
-
-[![Discord][discord-shield]][discord]
-[![Community Forum][forum-shield]][forum]
 
 ## Getting started
 
@@ -101,3 +102,22 @@ one: https://www.amazon.com/dp/B01N5MGEUS/ref=cm_sw_r_tw_dp_U_x_ObdNCb03P7QZJ
 * https://support.airthings.com/hc/en-us/articles/115002910089-How-to-respond-to-your-radon-levels?mobile_site=true
 * https://community.home-assistant.io/t/converting-sensor-measurement-units/98807
 * http://certi.us/Downloads/Canada_Meas_BW.pdf
+
+[airthings_wave]: https://github.com/custom-components/sensor.airthings_wave
+[buymecoffee]: buymeacoff.ee/3ZLzU76DI
+[buymecoffeebadge]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
+[buymebeer]: buymeacoff.ee/3ZLzU76DI
+[buymebeerbadge]: https://img.shields.io/badge/buy%20me%20a%20beer-donate-yellow.svg?style=for-the-badge
+[commits-shield]: https://img.shields.io/github/commit-activity/y/custom-components/sensor.airthings_wave.svg?style=for-the-badge
+[commits]: https://github.com/custom-components/sensor.airthings_wave/commits/master
+[customupdater]: https://github.com/custom-components/custom_updater
+[customupdaterbadge]: https://img.shields.io/badge/custom__updater-true-success.svg?style=for-the-badge
+[discord]: https://discord.gg/Qa5fW2R
+[discord-shield]: https://img.shields.io/discord/330944238910963714.svg?style=for-the-badge
+[exampleimg]: example.png
+[forum-shield]: https://img.shields.io/badge/community-forum-brightgreen.svg?style=for-the-badge
+[forum]: https://community.home-assistant.io/
+[license-shield]: https://img.shields.io/github/license/custom-components/sensor.airthings_wave.svg?style=for-the-badge
+[maintenance-shield]: https://img.shields.io/badge/maintainer-MartyTremblay-blue.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/custom-components/sensor.airthings_wave.svg?style=for-the-badge
+[releases]: https://github.com/custom-components/sensor.airthings_wave/releases
