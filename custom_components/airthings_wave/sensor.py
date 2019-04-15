@@ -33,6 +33,7 @@ from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  EVENT_HOMEASSISTANT_STOP, ILLUMINANCE,
                                  STATE_UNKNOWN)
 from homeassistant.helpers.entity import Entity
+VERSION = "0.4.0"
 
 REQUIREMENTS = ['pygatt[GATTTOOL]==4.0.3']
 
