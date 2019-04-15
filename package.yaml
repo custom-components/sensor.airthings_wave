@@ -4,17 +4,17 @@ author:
   name: Marty Tremblay
 description: ☢ Airthings Wave component
 files:
-- custom_components/airthings_wave/__init__.py
-- custom_components/airthings_wave/sensor.py
+  - custom_components/airthings_wave/__init__.py
+  - custom_components/airthings_wave/sensor.py
 keywords:
-- radon
-- gas
-- airthings
-- environmental
-- homeassistant
-- home-assistant
-- custom-component
-- python
+  - radon
+  - gas
+  - airthings
+  - environmental
+  - homeassistant
+  - home-assistant
+  - custom-component
+  - python
 license: MIT License
 name: sensor.airthings_wave
 type: component
