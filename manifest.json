@@ -3,6 +3,6 @@
   "name": "Airthings Wave",
   "documentation": "https://github.com/custom-components/sensor.airthings_wave/",
   "dependencies": [],
-  "codeowners": [@MartyTremblay],
+  "codeowners": ["@MartyTremblay"],
   "requirements": ["pygatt[GATTTOOL]==4.0.3"]
 }
