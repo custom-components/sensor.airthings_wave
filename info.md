@@ -15,26 +15,6 @@ hassio support for Airthings Wave BLE environmental radon sensor.
 
 ![ScreenShot](ScreenShot.png)
 
-Much of the code to build this component was inspired by these projects:
-* http://airthings.com/raspberry-pi/
-* https://github.com/marcelm/radonwave
-
-The aforementioned `radonwave` project is especially useful as it describes
-many of the BLE characteristics specific to this product and has good
-trouble-shooting tips. The script provided is also very useful in determining
-the MAC address of your AW device. See here:
-https://github.com/marcelm/radonwave/issues/3
-
-## Getting started
-
-Download
-```
-/custom_components/airthings_wave/
-```
-into
-```
-<config directory>/custom_components/airthings_wave/
-```
 **Example configuration.yaml:**
 
 ```yaml
