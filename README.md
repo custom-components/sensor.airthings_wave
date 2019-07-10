@@ -80,10 +80,6 @@ first.
 and will remain as `unknown` until then
 https://github.com/custom-components/sensor.airthings_wave/issues/2
 
-* Not yet compatible with
-[custom_updater](https://github.com/custom-components/custom_updater) and
-[tracker-card](https://github.com/custom-cards/tracker-card)
-
 * Not yet able to specify the `monitored_conditions` configuration
 
 * No translations available yet
