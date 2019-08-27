@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.5.0 (2019-04-08)
+
+- Made bluetooth implementation slightly more resilient. Thanks to https://community.home-assistant.io/t/airthings-radon-detector/87043/10?u=martytremblay 
+
 ## v0.4.0 (2019-04-08)
 
 - Upgraded to pygatt 4.0.3 to resolve stability issues

@@ -33,7 +33,7 @@ from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  EVENT_HOMEASSISTANT_STOP, ILLUMINANCE,
                                  STATE_UNKNOWN)
 from homeassistant.helpers.entity import Entity
-VERSION = '0.4.0'
+VERSION = '0.5.0'
 
 REQUIREMENTS = ['pygatt[GATTTOOL]==4.0.3']
 
@@ -361,8 +361,8 @@ class Monitor(threading.Thread):
             BLEError, NotConnectedError, NotificationTimeout)
 
         adapter = pygatt.backends.GATTToolBackend()
-        try:
-            while self.keep_going:
+        while self.keep_going:
+            try:
                 _LOGGER.debug("Connecting to %s", self.name)
 
                 # We need concurrent connect, so lets not reset the device
@@ -372,27 +372,26 @@ class Monitor(threading.Thread):
                 # Give the adaptor a breather
                 self.event.wait(1)
                 for s in sensors:
-                    val = struct.unpack(s.format_type,
-                        device.char_read(s.uuid, timeout=CONNECT_TIMEOUT))
+                    val = struct.unpack(
+                        s.format_type,
+                        device.char_read(
+                            s.uuid, timeout=CONNECT_TIMEOUT))
                     _LOGGER.debug("Sensor %s: %s", s.name, val)
 
                     if s.name == 'date_time':
                         val = str(datetime(val[0], val[1], val[2], val[3],
-                            val[4], val[5]).isoformat())
+                                        val[4], val[5]).isoformat())
                         self.data[s.name] = val
                     elif s.name == 'illuminance_accelerometer':
                         self.data['illuminance'] = str(val[0] * s.scale)
                         self.data['accelerometer'] = str(val[1] * s.scale)
                     else:
                         self.data[s.name] = str(round(val[0] * s.scale, 1))
-
+            except (BLEError, NotConnectedError, NotificationTimeout) as ex:
+                _LOGGER.error("Exception: %s ", str(ex))
+            finally:
                 adapter.stop()
                 self.event.wait(self.scan_interval.total_seconds())
-
-        except (BLEError, NotConnectedError, NotificationTimeout) as ex:
-            _LOGGER.error("Exception: %s ", str(ex))
-        finally:
-            adapter.stop()
 
     def terminate(self):
         """Signal runner to stop and join thread."""
