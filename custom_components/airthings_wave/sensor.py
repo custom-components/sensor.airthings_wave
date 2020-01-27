@@ -100,6 +100,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional('plus', default=False): cv.boolean,
 })
 
+
 class Sensor:
     def __init__(self, name, uuid, format_type, scale):
         self.name = name
@@ -107,9 +108,11 @@ class Sensor:
         self.format_type = format_type
         self.scale = scale
 
+
 class AirthingsWave:
-    def __init__(self, name):
+    def __init__(self, name, mac):
         self.name = name
+        self.mac = mac
         self.sensors = []
         self.sensors.append(Sensor('date_time', CHAR_UUID_DATETIME, 'HBBBBB', 0))
         self.sensors.append(Sensor('temperature', CHAR_UUID_TEMPERATURE, 'h', 1.0/100.0))
@@ -146,7 +149,8 @@ class AirthingsWave:
 
 
 class AirthingsWavePlus:
-    def __init__(self, name):
+    def __init__(self, name, mac):
+        self.mac = mac
         self.name = name
         self.sensor = Sensor('wave_pluss', CHAR_UUID_WAVE_PLUS, 'BBBBHHHHHHHH', 0)
 
@@ -185,10 +189,10 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
     if plus:
         _LOGGER.debug("Setting up Wave Plus...")
-        device = AirthingsWavePlus(name)
+        device = AirthingsWavePlus(name, mac)
     else:
         _LOGGER.debug("Setting up Wave...")
-        device = AirthingsWave(name)
+        device = AirthingsWave(name, mac)
 
     if CONF_UNIT_SYSTEM in config:
         unit_system = config[CONF_UNIT_SYSTEM]
@@ -198,19 +202,29 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         unit_system = UNIT_SYSTEMS[0]
 
     mon = Monitor(hass, mac, device, scan_interval)
-    add_entities([AirthingsTemperature(name + " Temperature", device)])
-    add_entities([AirthingsHumidity(name + " Humidity", device)])
+    add_entities([AirthingsSensor(name + " Temperature", device, TEMPERATURE, TEMP_CELSIUS, 
+        {ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE})])
+    add_entities([AirthingsSensor(name + " Humidity", device, DEVICE_CLASS_HUMIDITY, PERCENT, 
+        {ATTR_DEVICE_CLASS: DEVICE_CLASS_HUMIDITY})])
     add_entities([AirthingsRadon(name + " Radon 1 Day Average",
         device, 'radon_1day_avg', unit_system)])
     add_entities([AirthingsRadon(name + " Radon Long Term Average",
         device, 'radon_longterm_avg', unit_system)])
     if plus:
-        add_entities([AirthingsRelAtmPressure(name + " RelATMPressure", device)])
-        add_entities([AirthingsCo2(name + " Co2", device)])
-        add_entities([AirthingsVoc(name + " Voc", device)])
+        add_entities([AirthingsSensor(name + " RelATMPressure", device, 'rel_atm_pressure', 
+            ATM_METRIC_UNITS, {ATTR_DEVICE_CLASS: DEVICE_CLASS_PRESSURE})])
+        add_entities([AirthingsSensor(name + " Co2", device, 'co2', CO2_METRIC_UNITS, 
+            {ATTR_DEVICE_CLASS: DEVICE_CLASS_CO2,
+             ATTR_ICON: 'mdi:periodic-table-co2'})])
+        add_entities([AirthingsSensor(name + " Voc", device, 'voc', VOC_METRIC_UNITS, 
+            {ATTR_DEVICE_CLASS: DEVICE_CLASS_VOC,
+             ATTR_ICON: 'mdi:cloud'})])
     else:
-        add_entities([AirthingsIlluminance(name + " Illuminance", device)])
-        add_entities([AirthingsAccel(name + " Acceleration", device)])
+        add_entities([AirthingsSensor(name + " Illuminance", device, ILLUMINANCE, ILLUMINANCE_LUX, 
+            {ATTR_DEVICE_CLASS: DEVICE_CLASS_ILLUMINANCE})])
+        add_entities([AirthingsSensor(name + " Acceleration", device, 'accelerometer', SPEED_METRIC_UNITS,
+            {ATTR_DEVICE_CLASS: DEVICE_CLASS_ACCELEROMETER,
+             ATTR_ICON: 'mdi:vibrate'})])
 
 
     def monitor_stop(_service_or_event):
@@ -221,13 +235,17 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, monitor_stop)
     mon.start()
 
-class AirthingsHumidity(Entity):
-    """Representation of a Airthings humidity sensor."""
 
-    def __init__(self, name, device):
+class AirthingsSensor(Entity):
+    """General Representation of a Airthings sensor."""
+    def __init__(self, name, device, device_class, unit, device_attributes):
         """Initialize a sensor."""
+        _LOGGER.debug("Added sensor entity %s", name)
         self.device = device
         self._name = name
+        self._device_class = device_class
+        self._unit = unit
+        self._device_attributes = device_attributes
 
     @property
     def name(self):
@@ -237,51 +255,19 @@ class AirthingsHumidity(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.device.data[DEVICE_CLASS_HUMIDITY]
+        return self.device.data[self._device_class]
 
     @property
     def unit_of_measurement(self):
         """Return the unit the value is expressed in."""
-        return PERCENT
+        return self._unit
 
     @property
     def device_state_attributes(self):
         """Return the state attributes of the sensor."""
-        return {
-            ATTR_DEVICE_CLASS: DEVICE_CLASS_HUMIDITY,
-            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time']
-        }
+        self._device_attributes.update({ATTR_DEVICE_DATE_TIME: self.device.data['date_time']})
+        return self._device_attributes
 
-class AirthingsTemperature(Entity):
-    """Representation of a Airthings temperature sensor."""
-
-    def __init__(self, name, device):
-        """Initialize a sensor."""
-        self.device = device
-        self._name = name
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self):
-        """Return the state of the device."""
-        return self.device.data[TEMPERATURE]
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit the value is expressed in."""
-        return TEMP_CELSIUS
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes of the sensor."""
-        return {
-            ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
-            ATTR_DEVICE_DATE_TIME: self.device.data['date_time']
-        }
 
 class AirthingsRadon(Entity):
     """Representation of a Airthings radon sensor."""
@@ -346,165 +332,6 @@ class AirthingsRadon(Entity):
             ATTR_DEVICE_DATE_TIME: self.device.data['date_time'],
             ATTR_RADON_LEVEL: self.radon_level,
             ATTR_ICON: 'mdi:radioactive'
-        }
-
-
-class AirthingsIlluminance(Entity):
-    """Representation of a Airthings illuminance sensor."""
-
-    def __init__(self, name, device):
-        """Initialize a sensor."""
-        self.device = device
-        self._name = name
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self):
-        """Return the state of the device."""
-        return self.device.data[ILLUMINANCE]
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit the value is expressed in."""
-        return ILLUMINANCE_LUX
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes of the sensor."""
-        return {
-            ATTR_DEVICE_CLASS: DEVICE_CLASS_ILLUMINANCE,
-            ATTR_DEVICE_DATE_TIME: self.device.data['date_time']
-        }
-
-class AirthingsAccel(Entity):
-    """Representation of a Airthings accelerometer sensor."""
-
-    def __init__(self, name, device):
-        """Initialize a sensor."""
-        self.device = device
-        self._name = name
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self):
-        """Return the state of the device."""
-        return self.device.data['accelerometer']
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit the value is expressed in."""
-        return SPEED_METRIC_UNITS
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes of the sensor."""
-        return {
-            ATTR_DEVICE_CLASS: DEVICE_CLASS_ACCELEROMETER,
-            ATTR_DEVICE_DATE_TIME: self.device.data['date_time'],
-            ATTR_ICON: 'mdi:vibrate'
-        }
-
-class AirthingsRelAtmPressure(Entity):
-    """Representation of a Airthings Relative Atmosphere sensor."""
-
-    def __init__(self, name, device):
-        """Initialize a sensor."""
-        self.device = device
-        self._name = name
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self):
-        """Return the state of the device."""
-        return self.device.data['rel_atm_pressure']
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit the value is expressed in."""
-        return ATM_METRIC_UNITS
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes of the sensor."""
-        return {
-            ATTR_DEVICE_CLASS: DEVICE_CLASS_PRESSURE,
-            ATTR_DEVICE_DATE_TIME: self.device.data['date_time']
-        }
-
-class AirthingsCo2(Entity):
-    """Representation of a Airthings Co2 sensor."""
-
-    def __init__(self, name, device):
-        """Initialize a sensor."""
-        self.device = device
-        self._name = name
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self):
-        """Return the state of the device."""
-        return self.device.data['co2']
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit the value is expressed in."""
-        return CO2_METRIC_UNITS
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes of the sensor."""
-        return {
-            ATTR_DEVICE_CLASS: DEVICE_CLASS_CO2,
-            ATTR_DEVICE_DATE_TIME: self.device.data['date_time'],
-            ATTR_ICON: 'mdi:cloud'
-        }
-
-class AirthingsVoc(Entity):
-    """Representation of a Airthings VOC sensor."""
-
-    def __init__(self, name, device):
-        """Initialize a sensor."""
-        self.device = device
-        self._name = name
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self):
-        """Return the state of the device."""
-        return self.device.data['voc']
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit the value is expressed in."""
-        return VOC_METRIC_UNITS
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes of the sensor."""
-        return {
-            ATTR_DEVICE_CLASS: DEVICE_CLASS_VOC,
-            ATTR_DEVICE_DATE_TIME: self.device.data['date_time'],
-            ATTR_ICON: 'mdi:cloud'
         }
 
 
