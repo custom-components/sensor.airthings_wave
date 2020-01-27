@@ -59,6 +59,10 @@ sensor:
 
   (string)(Optional) The interval between polls. Defaults to 300 seconds (5 minutes)
 
+**plus**
+
+  (boolean)(Optional) If set to True it will try to get data from the device as a Airthings wave plus.
+
 ## Limitations
 
 It may be possible that the Wave must be connected to the official app at least
@@ -73,8 +77,6 @@ Make sure you install the latest firmware on the device using the official app
 first.
 
 ## Known Issues
-
-* Note yet compatible with Airthings Wave __Plus__
 
 * Values only appear after first scan_interval (default 5 minutes) has passed
 and will remain as `unknown` until then
