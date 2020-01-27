@@ -29,6 +29,7 @@ from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  TEMP_CELSIUS, DEVICE_CLASS_HUMIDITY,
                                  DEVICE_CLASS_ILLUMINANCE,
                                  DEVICE_CLASS_TEMPERATURE,
+                                 DEVICE_CLASS_PRESSURE,
                                  DEVICE_CLASS_TIMESTAMP,
                                  EVENT_HOMEASSISTANT_STOP, ILLUMINANCE,
                                  STATE_UNKNOWN)
@@ -47,11 +48,17 @@ ATTR_DEVICE_DATE_TIME = 'device_date_time'
 ATTR_RADON_LEVEL = 'radon_level'
 DEVICE_CLASS_RADON='radon'
 DEVICE_CLASS_ACCELEROMETER='accelerometer'
+DEVICE_CLASS_CO2='co2'
+DEVICE_CLASS_VOC='voc'
+
 ILLUMINANCE_LUX = 'lx'
 PERCENT = '%'
 SPEED_METRIC_UNITS = 'm/s2'
 VOLUME_BECQUEREL = 'Bq/m3'
 VOLUME_PICOCURIE = 'pCi/L'
+ATM_METRIC_UNITS = 'hPa'
+CO2_METRIC_UNITS = 'ppm'
+VOC_METRIC_UNITS = 'ppb'
 
 BQ_TO_PCI_MULTIPLIER = 0.027
 
@@ -81,6 +88,7 @@ CHAR_UUID_HUMIDITY = UUID(0x2A6F)
 CHAR_UUID_RADON_1DAYAVG = 'b42e01aa-ade7-11e4-89d3-123b93f75cba'
 CHAR_UUID_RADON_LONG_TERM_AVG = 'b42e0a4c-ade7-11e4-89d3-123b93f75cba'
 CHAR_UUID_ILLUMINANCE_ACCELEROMETER = 'b42e1348-ade7-11e4-89d3-123b93f75cba'
+CHAR_UUID_WAVE_PLUS = 'b42e2a68-ade7-11e4-89d3-123b93f75cba'
 
 UNIT_SYSTEMS = [CONF_UNIT_SYSTEM_IMPERIAL, CONF_UNIT_SYSTEM_METRIC]
 
@@ -89,6 +97,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
     vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
     vol.Optional(CONF_UNIT_SYSTEM): vol.In(UNIT_SYSTEMS),
+    vol.Optional(CONF_PLUS, default=False): cv.boolean,
 })
 
 class Sensor:
@@ -100,14 +109,7 @@ class Sensor:
 
 
 sensors = []
-sensors.append(Sensor('date_time', CHAR_UUID_DATETIME, 'HBBBBB', 0))
-sensors.append(Sensor('temperature', CHAR_UUID_TEMPERATURE, 'h', 1.0/100.0))
-sensors.append(Sensor('humidity', CHAR_UUID_HUMIDITY, 'H', 1.0/100.0))
-sensors.append(Sensor('radon_1day_avg', CHAR_UUID_RADON_1DAYAVG, 'H', 1.0))
-sensors.append(Sensor('radon_longterm_avg',
-    CHAR_UUID_RADON_LONG_TERM_AVG, 'H', 1.0))
-sensors.append(Sensor('illuminance_accelerometer',
-    CHAR_UUID_ILLUMINANCE_ACCELEROMETER, 'BB', 1.0))
+
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
@@ -116,8 +118,21 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     mac = config.get(CONF_MAC)
     scan_interval = config.get(CONF_SCAN_INTERVAL)
     unit_system = config.get(CONF_UNIT_SYSTEM)
+    plus = config.get(CONF_PLUS)
 
     _LOGGER.debug("Setting up...")
+
+    if plus:
+        sensors.append(Sensor('wave_pluss', CHAR_UUID_WAVE_PLUS, 'BBBBHHHHHHHH', 0))
+    else:
+        sensors.append(Sensor('date_time', CHAR_UUID_DATETIME, 'HBBBBB', 0))
+        sensors.append(Sensor('temperature', CHAR_UUID_TEMPERATURE, 'h', 1.0/100.0))
+        sensors.append(Sensor('humidity', CHAR_UUID_HUMIDITY, 'H', 1.0/100.0))
+        sensors.append(Sensor('radon_1day_avg', CHAR_UUID_RADON_1DAYAVG, 'H', 1.0))
+        sensors.append(Sensor('radon_longterm_avg',
+            CHAR_UUID_RADON_LONG_TERM_AVG, 'H', 1.0))
+        sensors.append(Sensor('illuminance_accelerometer',
+            CHAR_UUID_ILLUMINANCE_ACCELEROMETER, 'BB', 1.0))
 
     if CONF_UNIT_SYSTEM in config:
         unit_system = config[CONF_UNIT_SYSTEM]
@@ -133,8 +148,14 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         mon, 'radon_1day_avg', unit_system)])
     add_entities([AirthingsRadon(name + " Radon Long Term Average",
         mon, 'radon_longterm_avg', unit_system)])
-    add_entities([AirthingsIlluminance(name + " Illuminance", mon)])
-    add_entities([AirthingsAccel(name + " Acceleration", mon)])
+    if not plus:
+        add_entities([AirthingsIlluminance(name + " Illuminance", mon)])
+        add_entities([AirthingsAccel(name + " Acceleration", mon)])
+    else:
+        add_entities([AirthingsRelAtmPressure(name + " RelATMPressure", mon)])
+        add_entities([AirthingsCo2(name + " Co2", mon)])
+        add_entities([AirthingsVoc(name + " Voc", mon)])
+
 
     def monitor_stop(_service_or_event):
         """Stop the monitor thread."""
@@ -335,6 +356,102 @@ class AirthingsAccel(Entity):
             ATTR_ICON: 'mdi:vibrate'
         }
 
+class AirthingsRelAtmPressure(Entity):
+    """Representation of a Airthings Relative Atmosphere sensor."""
+
+    def __init__(self, name, mon):
+        """Initialize a sensor."""
+        self.mon = mon
+        self._name = name
+
+    @property
+    def name(self):
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def state(self):
+        """Return the state of the device."""
+        return self.mon.data['rel_atm_pressure']
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit the value is expressed in."""
+        return ATM_METRIC_UNITS
+
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes of the sensor."""
+        return {
+            ATTR_DEVICE_CLASS: DEVICE_CLASS_PRESSURE,
+            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time']
+        }
+
+class AirthingsCo2(Entity):
+    """Representation of a Airthings Co2 sensor."""
+
+    def __init__(self, name, mon):
+        """Initialize a sensor."""
+        self.mon = mon
+        self._name = name
+
+    @property
+    def name(self):
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def state(self):
+        """Return the state of the device."""
+        return self.mon.data['co2']
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit the value is expressed in."""
+        return CO2_METRIC_UNITS
+
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes of the sensor."""
+        return {
+            ATTR_DEVICE_CLASS: DEVICE_CLASS_CO2,
+            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time'],
+            ATTR_ICON: 'mdi:cloud'
+        }
+
+class AirthingsVoc(Entity):
+    """Representation of a Airthings VOC sensor."""
+
+    def __init__(self, name, mon):
+        """Initialize a sensor."""
+        self.mon = mon
+        self._name = name
+
+    @property
+    def name(self):
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def state(self):
+        """Return the state of the device."""
+        return self.mon.data['voc']
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit the value is expressed in."""
+        return VOC_METRIC_UNITS
+
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes of the sensor."""
+        return {
+            ATTR_DEVICE_CLASS: DEVICE_CLASS_VOC,
+            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time'],
+            ATTR_ICON: 'mdi:cloud'
+        }
+
+
 class Monitor(threading.Thread):
     """Connection handling."""
 
@@ -349,7 +466,8 @@ class Monitor(threading.Thread):
         self.data = {'date_time': STATE_UNKNOWN, 'temperature': STATE_UNKNOWN,
             'humidity': STATE_UNKNOWN, 'radon_1day_avg': STATE_UNKNOWN,
             'radon_longterm_avg': STATE_UNKNOWN, 'illuminance': STATE_UNKNOWN,
-            'accelerometer' : STATE_UNKNOWN}
+            'accelerometer' : STATE_UNKNOWN, 'rel_atm_pressure' : STATE_UNKNOWN,
+            'co2' : STATE_UNKNOWN, 'voc' : STATE_UNKNOWN}
         self.keep_going = True
         self.event = threading.Event()
 
@@ -382,6 +500,16 @@ class Monitor(threading.Thread):
                         val = str(datetime(val[0], val[1], val[2], val[3],
                                         val[4], val[5]).isoformat())
                         self.data[s.name] = val
+                    elif s.name == 'wave_pluss':
+                        self.data['date_time'] = str(datetime.isoformat(datetime.now()))
+                        self.data['humidity'] = val[1]/2.0
+                        self.data['radon_1day_avg'] = val[4] if 0 <= val[4] <= 16383 else STATE_UNKNOWN 
+                        self.data['radon_longterm_avg'] = val[5] if 0 <= val[5] <= 16383 else STATE_UNKNOWN 
+                        self.data['temperature'] = val[6]/100.0
+                        self.data['rel_atm_pressure'] = val[7]/50.0
+                        self.data['co2'] = val[8]*1.0
+                        self.data['voc'] = val[9]*1.0
+
                     elif s.name == 'illuminance_accelerometer':
                         self.data['illuminance'] = str(val[0] * s.scale)
                         self.data['accelerometer'] = str(val[1] * s.scale)
