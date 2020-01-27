@@ -97,7 +97,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
     vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
     vol.Optional(CONF_UNIT_SYSTEM): vol.In(UNIT_SYSTEMS),
-    vol.Optional(CONF_PLUS, default=False): cv.boolean,
+    vol.Optional('plus', default=False): cv.boolean,
 })
 
 class Sensor:
@@ -107,9 +107,72 @@ class Sensor:
         self.format_type = format_type
         self.scale = scale
 
+class AirthingsWave:
+    def __init__(self, name):
+        self.name = name
+        self.sensors = []
+        self.sensors.append(Sensor('date_time', CHAR_UUID_DATETIME, 'HBBBBB', 0))
+        self.sensors.append(Sensor('temperature', CHAR_UUID_TEMPERATURE, 'h', 1.0/100.0))
+        self.sensors.append(Sensor('humidity', CHAR_UUID_HUMIDITY, 'H', 1.0/100.0))
+        self.sensors.append(Sensor('radon_1day_avg', CHAR_UUID_RADON_1DAYAVG, 'H', 1.0))
+        self.sensors.append(Sensor('radon_longterm_avg',
+            CHAR_UUID_RADON_LONG_TERM_AVG, 'H', 1.0))
+        self.sensors.append(Sensor('illuminance_accelerometer',
+            CHAR_UUID_ILLUMINANCE_ACCELEROMETER, 'BB', 1.0))
 
-sensors = []
+        self.data = {'date_time': STATE_UNKNOWN, 'temperature': STATE_UNKNOWN,
+            'humidity': STATE_UNKNOWN, 'radon_1day_avg': STATE_UNKNOWN,
+            'radon_longterm_avg': STATE_UNKNOWN, 'illuminance': STATE_UNKNOWN,
+            'accelerometer' : STATE_UNKNOWN}
 
+    def get_data(self, connection):
+        for s in self.sensors:
+            val = struct.unpack(
+                s.format_type,
+                device.char_read(
+                    s.uuid, timeout=CONNECT_TIMEOUT))
+            _LOGGER.debug("Sensor %s: %s", s.name, val)
+
+            if s.name == 'date_time':
+                val = str(datetime(val[0], val[1], val[2], val[3],
+                                val[4], val[5]).isoformat())
+                self.data[s.name] = val
+
+            elif s.name == 'illuminance_accelerometer':
+                self.data['illuminance'] = str(val[0] * s.scale)
+                self.data['accelerometer'] = str(val[1] * s.scale)
+            else:
+                self.data[s.name] = str(round(val[0] * s.scale, 1))
+
+
+class AirthingsWavePlus:
+    def __init__(self, name):
+        self.name = name
+        self.sensor = Sensor('wave_pluss', CHAR_UUID_WAVE_PLUS, 'BBBBHHHHHHHH', 0)
+
+        self.data = {'date_time': STATE_UNKNOWN, 'temperature': STATE_UNKNOWN,
+            'humidity': STATE_UNKNOWN, 'radon_1day_avg': STATE_UNKNOWN,
+            'radon_longterm_avg': STATE_UNKNOWN,
+            'accelerometer' : STATE_UNKNOWN, 'rel_atm_pressure' : STATE_UNKNOWN,
+            'co2' : STATE_UNKNOWN, 'voc' : STATE_UNKNOWN}
+
+    def get_data(self, connection):
+        _LOGGER.debug("Reading sensor %s", self.name)
+        data = connection.char_read_handle('0x000d',timeout=CONNECT_TIMEOUT)
+        _LOGGER.debug("Got raw data %s", data)
+        val = struct.unpack(
+            self.sensor.format_type,
+            data)
+        _LOGGER.debug("Sensor %s: %s", self.sensor.name, val)
+
+        self.data['date_time'] = str(datetime.isoformat(datetime.now()))
+        self.data['humidity'] = val[1]/2.0
+        self.data['radon_1day_avg'] = val[4] if 0 <= val[4] <= 16383 else STATE_UNKNOWN 
+        self.data['radon_longterm_avg'] = val[5] if 0 <= val[5] <= 16383 else STATE_UNKNOWN 
+        self.data['temperature'] = val[6]/100.0
+        self.data['rel_atm_pressure'] = val[7]/50.0
+        self.data['co2'] = val[8]*1.0
+        self.data['voc'] = val[9]*1.0
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
@@ -118,21 +181,14 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     mac = config.get(CONF_MAC)
     scan_interval = config.get(CONF_SCAN_INTERVAL)
     unit_system = config.get(CONF_UNIT_SYSTEM)
-    plus = config.get(CONF_PLUS)
-
-    _LOGGER.debug("Setting up...")
+    plus = config.get('plus')
 
     if plus:
-        sensors.append(Sensor('wave_pluss', CHAR_UUID_WAVE_PLUS, 'BBBBHHHHHHHH', 0))
+        _LOGGER.debug("Setting up Wave Plus...")
+        device = AirthingsWavePlus(name)
     else:
-        sensors.append(Sensor('date_time', CHAR_UUID_DATETIME, 'HBBBBB', 0))
-        sensors.append(Sensor('temperature', CHAR_UUID_TEMPERATURE, 'h', 1.0/100.0))
-        sensors.append(Sensor('humidity', CHAR_UUID_HUMIDITY, 'H', 1.0/100.0))
-        sensors.append(Sensor('radon_1day_avg', CHAR_UUID_RADON_1DAYAVG, 'H', 1.0))
-        sensors.append(Sensor('radon_longterm_avg',
-            CHAR_UUID_RADON_LONG_TERM_AVG, 'H', 1.0))
-        sensors.append(Sensor('illuminance_accelerometer',
-            CHAR_UUID_ILLUMINANCE_ACCELEROMETER, 'BB', 1.0))
+        _LOGGER.debug("Setting up Wave...")
+        device = AirthingsWave(name)
 
     if CONF_UNIT_SYSTEM in config:
         unit_system = config[CONF_UNIT_SYSTEM]
@@ -141,20 +197,20 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     else:
         unit_system = UNIT_SYSTEMS[0]
 
-    mon = Monitor(hass, mac, name, scan_interval)
-    add_entities([AirthingsTemperature(name + " Temperature", mon)])
-    add_entities([AirthingsHumidity(name + " Humidity", mon)])
+    mon = Monitor(hass, mac, device, scan_interval)
+    add_entities([AirthingsTemperature(name + " Temperature", device)])
+    add_entities([AirthingsHumidity(name + " Humidity", device)])
     add_entities([AirthingsRadon(name + " Radon 1 Day Average",
-        mon, 'radon_1day_avg', unit_system)])
+        device, 'radon_1day_avg', unit_system)])
     add_entities([AirthingsRadon(name + " Radon Long Term Average",
-        mon, 'radon_longterm_avg', unit_system)])
-    if not plus:
-        add_entities([AirthingsIlluminance(name + " Illuminance", mon)])
-        add_entities([AirthingsAccel(name + " Acceleration", mon)])
+        device, 'radon_longterm_avg', unit_system)])
+    if plus:
+        add_entities([AirthingsRelAtmPressure(name + " RelATMPressure", device)])
+        add_entities([AirthingsCo2(name + " Co2", device)])
+        add_entities([AirthingsVoc(name + " Voc", device)])
     else:
-        add_entities([AirthingsRelAtmPressure(name + " RelATMPressure", mon)])
-        add_entities([AirthingsCo2(name + " Co2", mon)])
-        add_entities([AirthingsVoc(name + " Voc", mon)])
+        add_entities([AirthingsIlluminance(name + " Illuminance", device)])
+        add_entities([AirthingsAccel(name + " Acceleration", device)])
 
 
     def monitor_stop(_service_or_event):
@@ -168,9 +224,9 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 class AirthingsHumidity(Entity):
     """Representation of a Airthings humidity sensor."""
 
-    def __init__(self, name, mon):
+    def __init__(self, name, device):
         """Initialize a sensor."""
-        self.mon = mon
+        self.device = device
         self._name = name
 
     @property
@@ -181,7 +237,7 @@ class AirthingsHumidity(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.mon.data[DEVICE_CLASS_HUMIDITY]
+        return self.device.data[DEVICE_CLASS_HUMIDITY]
 
     @property
     def unit_of_measurement(self):
@@ -199,9 +255,9 @@ class AirthingsHumidity(Entity):
 class AirthingsTemperature(Entity):
     """Representation of a Airthings temperature sensor."""
 
-    def __init__(self, name, mon):
+    def __init__(self, name, device):
         """Initialize a sensor."""
-        self.mon = mon
+        self.device = device
         self._name = name
 
     @property
@@ -212,7 +268,7 @@ class AirthingsTemperature(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.mon.data[TEMPERATURE]
+        return self.device.data[TEMPERATURE]
 
     @property
     def unit_of_measurement(self):
@@ -224,15 +280,15 @@ class AirthingsTemperature(Entity):
         """Return the state attributes of the sensor."""
         return {
             ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE,
-            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time']
+            ATTR_DEVICE_DATE_TIME: self.device.data['date_time']
         }
 
 class AirthingsRadon(Entity):
     """Representation of a Airthings radon sensor."""
 
-    def __init__(self, name, mon, subclass, unit_system):
+    def __init__(self, name, device, subclass, unit_system):
         """Initialize a sensor."""
-        self.mon = mon
+        self.device = device
         self._subclass = subclass
         self._name = name
         self.radon_level = STATE_UNKNOWN
@@ -249,14 +305,14 @@ class AirthingsRadon(Entity):
         try:
             if self.unit_system == CONF_UNIT_SYSTEM_IMPERIAL:
                 self.converted_radon_data = round(
-                    float(self.mon.data[self._subclass]) *
+                    float(self.device.data[self._subclass]) *
                         BQ_TO_PCI_MULTIPLIER, 2)
             else:
-                self.converted_radon_data = self.mon.data[self._subclass]
+                self.converted_radon_data = self.device.data[self._subclass]
 
         except Exception as ex:
             _LOGGER.warn("Radon data is : got an exception: %s", ex)
-            self.converted_radon_data = self.mon.data[self._subclass]
+            self.converted_radon_data = self.device.data[self._subclass]
 
         return self.converted_radon_data
 
@@ -273,11 +329,11 @@ class AirthingsRadon(Entity):
         """Return the state attributes of the sensor."""
 
         try:
-            if VERY_LOW[0] <= float(self.mon.data[self._subclass]) <= VERY_LOW[1]:
+            if VERY_LOW[0] <= float(self.device.data[self._subclass]) <= VERY_LOW[1]:
                 self.radon_level = VERY_LOW[2]
-            elif LOW[0] <= float(self.mon.data[self._subclass]) <= LOW[1]:
+            elif LOW[0] <= float(self.device.data[self._subclass]) <= LOW[1]:
                 self.radon_level = LOW[2]
-            elif MODERATE[0] <= float(self.mon.data[self._subclass]) <= MODERATE[1]:
+            elif MODERATE[0] <= float(self.device.data[self._subclass]) <= MODERATE[1]:
                 self.radon_level = MODERATE[2]
             else:
                 self.radon_level = HIGH[2]
@@ -287,7 +343,7 @@ class AirthingsRadon(Entity):
 
         return {
             ATTR_DEVICE_CLASS: DEVICE_CLASS_RADON,
-            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time'],
+            ATTR_DEVICE_DATE_TIME: self.device.data['date_time'],
             ATTR_RADON_LEVEL: self.radon_level,
             ATTR_ICON: 'mdi:radioactive'
         }
@@ -296,9 +352,9 @@ class AirthingsRadon(Entity):
 class AirthingsIlluminance(Entity):
     """Representation of a Airthings illuminance sensor."""
 
-    def __init__(self, name, mon):
+    def __init__(self, name, device):
         """Initialize a sensor."""
-        self.mon = mon
+        self.device = device
         self._name = name
 
     @property
@@ -309,7 +365,7 @@ class AirthingsIlluminance(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.mon.data[ILLUMINANCE]
+        return self.device.data[ILLUMINANCE]
 
     @property
     def unit_of_measurement(self):
@@ -321,15 +377,15 @@ class AirthingsIlluminance(Entity):
         """Return the state attributes of the sensor."""
         return {
             ATTR_DEVICE_CLASS: DEVICE_CLASS_ILLUMINANCE,
-            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time']
+            ATTR_DEVICE_DATE_TIME: self.device.data['date_time']
         }
 
 class AirthingsAccel(Entity):
     """Representation of a Airthings accelerometer sensor."""
 
-    def __init__(self, name, mon):
+    def __init__(self, name, device):
         """Initialize a sensor."""
-        self.mon = mon
+        self.device = device
         self._name = name
 
     @property
@@ -340,7 +396,7 @@ class AirthingsAccel(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.mon.data['accelerometer']
+        return self.device.data['accelerometer']
 
     @property
     def unit_of_measurement(self):
@@ -352,16 +408,16 @@ class AirthingsAccel(Entity):
         """Return the state attributes of the sensor."""
         return {
             ATTR_DEVICE_CLASS: DEVICE_CLASS_ACCELEROMETER,
-            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time'],
+            ATTR_DEVICE_DATE_TIME: self.device.data['date_time'],
             ATTR_ICON: 'mdi:vibrate'
         }
 
 class AirthingsRelAtmPressure(Entity):
     """Representation of a Airthings Relative Atmosphere sensor."""
 
-    def __init__(self, name, mon):
+    def __init__(self, name, device):
         """Initialize a sensor."""
-        self.mon = mon
+        self.device = device
         self._name = name
 
     @property
@@ -372,7 +428,7 @@ class AirthingsRelAtmPressure(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.mon.data['rel_atm_pressure']
+        return self.device.data['rel_atm_pressure']
 
     @property
     def unit_of_measurement(self):
@@ -384,15 +440,15 @@ class AirthingsRelAtmPressure(Entity):
         """Return the state attributes of the sensor."""
         return {
             ATTR_DEVICE_CLASS: DEVICE_CLASS_PRESSURE,
-            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time']
+            ATTR_DEVICE_DATE_TIME: self.device.data['date_time']
         }
 
 class AirthingsCo2(Entity):
     """Representation of a Airthings Co2 sensor."""
 
-    def __init__(self, name, mon):
+    def __init__(self, name, device):
         """Initialize a sensor."""
-        self.mon = mon
+        self.device = device
         self._name = name
 
     @property
@@ -403,7 +459,7 @@ class AirthingsCo2(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.mon.data['co2']
+        return self.device.data['co2']
 
     @property
     def unit_of_measurement(self):
@@ -415,16 +471,16 @@ class AirthingsCo2(Entity):
         """Return the state attributes of the sensor."""
         return {
             ATTR_DEVICE_CLASS: DEVICE_CLASS_CO2,
-            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time'],
+            ATTR_DEVICE_DATE_TIME: self.device.data['date_time'],
             ATTR_ICON: 'mdi:cloud'
         }
 
 class AirthingsVoc(Entity):
     """Representation of a Airthings VOC sensor."""
 
-    def __init__(self, name, mon):
+    def __init__(self, name, device):
         """Initialize a sensor."""
-        self.mon = mon
+        self.device = device
         self._name = name
 
     @property
@@ -435,7 +491,7 @@ class AirthingsVoc(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.mon.data['voc']
+        return self.device.data['voc']
 
     @property
     def unit_of_measurement(self):
@@ -447,7 +503,7 @@ class AirthingsVoc(Entity):
         """Return the state attributes of the sensor."""
         return {
             ATTR_DEVICE_CLASS: DEVICE_CLASS_VOC,
-            ATTR_DEVICE_DATE_TIME: self.mon.data['date_time'],
+            ATTR_DEVICE_DATE_TIME: self.device.data['date_time'],
             ATTR_ICON: 'mdi:cloud'
         }
 
@@ -455,19 +511,15 @@ class AirthingsVoc(Entity):
 class Monitor(threading.Thread):
     """Connection handling."""
 
-    def __init__(self, hass, mac, name, scan_interval):
+    def __init__(self, hass, mac, device, scan_interval):
         """Construct interface object."""
         threading.Thread.__init__(self)
         self.daemon = False
         self.hass = hass
         self.mac = mac
-        self.name = name
+        self.device = device
         self.scan_interval = scan_interval
-        self.data = {'date_time': STATE_UNKNOWN, 'temperature': STATE_UNKNOWN,
-            'humidity': STATE_UNKNOWN, 'radon_1day_avg': STATE_UNKNOWN,
-            'radon_longterm_avg': STATE_UNKNOWN, 'illuminance': STATE_UNKNOWN,
-            'accelerometer' : STATE_UNKNOWN, 'rel_atm_pressure' : STATE_UNKNOWN,
-            'co2' : STATE_UNKNOWN, 'voc' : STATE_UNKNOWN}
+
         self.keep_going = True
         self.event = threading.Event()
 
@@ -485,36 +537,12 @@ class Monitor(threading.Thread):
 
                 # We need concurrent connect, so lets not reset the device
                 adapter.start(reset_on_start=False)
-                device = adapter.connect(self.mac, CONNECT_TIMEOUT)
+                connection = adapter.connect(self.mac, CONNECT_TIMEOUT)
 
                 # Give the adaptor a breather
                 self.event.wait(1)
-                for s in sensors:
-                    val = struct.unpack(
-                        s.format_type,
-                        device.char_read(
-                            s.uuid, timeout=CONNECT_TIMEOUT))
-                    _LOGGER.debug("Sensor %s: %s", s.name, val)
+                self.device.get_data(connection)
 
-                    if s.name == 'date_time':
-                        val = str(datetime(val[0], val[1], val[2], val[3],
-                                        val[4], val[5]).isoformat())
-                        self.data[s.name] = val
-                    elif s.name == 'wave_pluss':
-                        self.data['date_time'] = str(datetime.isoformat(datetime.now()))
-                        self.data['humidity'] = val[1]/2.0
-                        self.data['radon_1day_avg'] = val[4] if 0 <= val[4] <= 16383 else STATE_UNKNOWN 
-                        self.data['radon_longterm_avg'] = val[5] if 0 <= val[5] <= 16383 else STATE_UNKNOWN 
-                        self.data['temperature'] = val[6]/100.0
-                        self.data['rel_atm_pressure'] = val[7]/50.0
-                        self.data['co2'] = val[8]*1.0
-                        self.data['voc'] = val[9]*1.0
-
-                    elif s.name == 'illuminance_accelerometer':
-                        self.data['illuminance'] = str(val[0] * s.scale)
-                        self.data['accelerometer'] = str(val[1] * s.scale)
-                    else:
-                        self.data[s.name] = str(round(val[0] * s.scale, 1))
             except (BLEError, NotConnectedError, NotificationTimeout) as ex:
                 _LOGGER.error("Exception: %s ", str(ex))
             finally:
