@@ -28,11 +28,22 @@ CHAR_UUID_WAVE_PLUS_DATA = UUID('b42e2a68-ade7-11e4-89d3-123b93f75cba')
 
 Characteristic = namedtuple('Characteristic', ['uuid', 'name', 'format'])
 
-manufacturer_characteristics = Characteristic(CHAR_UUID_MANUFACTURER_NAME, 'Manufacturer', "utf-8")
+manufacturer_characteristics = Characteristic(CHAR_UUID_MANUFACTURER_NAME, 'manufacturer', "utf-8")
 device_info_characteristics = [manufacturer_characteristics,
-                               Characteristic(CHAR_UUID_SERIAL_NUMBER_STRING, 'Serial nr', "utf-8"),
-                               Characteristic(CHAR_UUID_MODEL_NUMBER_STRING, 'Model nr', "utf-8"),
-                               Characteristic(CHAR_UUID_DEVICE_NAME, 'Device name', "utf-8")]
+                               Characteristic(CHAR_UUID_SERIAL_NUMBER_STRING, 'serial_nr', "utf-8"),
+                               Characteristic(CHAR_UUID_MODEL_NUMBER_STRING, 'model_nr', "utf-8"),
+                               Characteristic(CHAR_UUID_DEVICE_NAME, 'device_name', "utf-8")]
+
+class AirthingsDeviceInfo:
+    def __init__(self, manufacturer='', serial_nr='', model_nr='', device_name=''):
+        self.manufacturer = manufacturer
+        self.serial_nr = serial_nr
+        self.model_nr = model_nr
+        self.device_name = device_name
+
+    def __str__(self):
+        return "Manufacturer: {} Model: {} Serial: {} Device:{}".format(
+            self.manufacturer, self.model_nr, self.serial_nr, self.device_name)
 
 sensors_characteristics_uuid = [CHAR_UUID_TEMPERATURE, CHAR_UUID_HUMIDITY, CHAR_UUID_RADON_1DAYAVG,
                                 CHAR_UUID_RADON_LONG_TERM_AVG, CHAR_UUID_ILLUMINANCE_ACCELEROMETER,
@@ -100,17 +111,18 @@ sensor_decoders = {str(CHAR_UUID_WAVE_PLUS_DATA):WavePlussDecode(name="Pluss", f
 
 
 class AirthingsWaveDetect:
-    def __init__(self, scan_interval):
+    def __init__(self, scan_interval, mac=None):
         self.adapter = pygatt.backends.GATTToolBackend()
-        self.airthing_devices = []
+        self.airthing_devices = [] if mac is None else [mac]
         self.sensors = []
         self.sensordata = {}
         self.scan_interval = scan_interval
         self.last_scan = -1
 
+
     def find_devices(self):
         # Scan for devices and try to figure out if it is an airthings device.
-        self.adapter.start()
+        self.adapter.start(reset_on_start=False)
         devices = self.adapter.scan(timeout=3)
         self.adapter.stop()
 
@@ -118,7 +130,7 @@ class AirthingsWaveDetect:
             mac = device['address']
             _LOGGER.debug("connecting to {}".format(mac))
             try:
-                self.adapter.start()
+                self.adapter.start(reset_on_start=False)
                 dev = self.adapter.connect(mac, 3)
                 _LOGGER.debug("Connected")
                 try:
@@ -139,17 +151,16 @@ class AirthingsWaveDetect:
     def get_info(self):
         # Try to get some info from the discovered airthings devices
         self.devices = {}
-        Info = namedtuple('Info', ['name', 'value'])
+
         for mac in self.airthing_devices:
-            device = []
+            device = AirthingsDeviceInfo(serial_nr=mac)
             try:
-                self.adapter.start()
+                self.adapter.start(reset_on_start=False)
                 dev = self.adapter.connect(mac, 3)
                 for characteristic in device_info_characteristics:
                     try:
                         data = dev.char_read(characteristic.uuid)
-                        info = Info(characteristic.name, data.decode(characteristic.format))
-                        device.append(info)
+                        setattr(device, characteristic.name, data.decode(characteristic.format))
                     except (BLEError, NotConnectedError, NotificationTimeout):
                         _LOGGER.exception("")
                 dev.disconnect()
@@ -164,7 +175,7 @@ class AirthingsWaveDetect:
         self.sensors = {}
         for mac in self.airthing_devices:
             try:
-                self.adapter.start()
+                self.adapter.start(reset_on_start=False)
                 dev = self.adapter.connect(mac, 3)
                 characteristics = dev.discover_characteristics()
                 sensor_characteristics =  []
@@ -180,15 +191,17 @@ class AirthingsWaveDetect:
 
     def get_sensor_data(self):
         if time.monotonic() - self.last_scan > self.scan_interval:
+            self.last_scan = time.monotonic()
             for mac, characteristics in self.sensors.items():
                 try:
-                    self.adapter.start()
+                    self.adapter.start(reset_on_start=False)
                     dev = self.adapter.connect(mac, 3)
                     for characteristic in characteristics:
                         try:
                             data = dev.char_read_handle("0x{:04x}".format(characteristic.handle))
                             if characteristic.uuid in sensor_decoders:
                                 sensor_data = sensor_decoders[characteristic.uuid].decode_data(data)
+                                _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
                                 self.sensordata[mac] = sensor_data
                         except (BLEError, NotConnectedError, NotificationTimeout):
                             _LOGGER.exception("Failed to read characteristic")
@@ -200,6 +213,7 @@ class AirthingsWaveDetect:
 
         return self.sensordata
 
+
 if __name__ == "__main__":
     logging.basicConfig()
     _LOGGER.setLevel(logging.INFO)
@@ -208,8 +222,7 @@ if __name__ == "__main__":
     if num_dev_found > 0:
         devices = ad.get_info()
         for mac, dev in devices.items():
-            for info in dev:
-                _LOGGER.info("{}: {}: {}".format(mac, info.name, info.value))
+            _LOGGER.info("{}: {}".format(mac, dev))
 
         devices_sensors = ad.get_sensors()
         for mac, sensors in devices_sensors.items():

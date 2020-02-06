@@ -13,11 +13,10 @@ For more details about this platform, please refer to the documentation at
 https://home-assistant.io/components/sensor.airthings_wave/
 """
 import logging
-import struct
 import threading
-from datetime import datetime, timedelta
+from datetime import timedelta
 
-from bluepy.btle import UUID
+from .airthings import AirthingsWaveDetect
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
@@ -56,7 +55,7 @@ PERCENT = '%'
 SPEED_METRIC_UNITS = 'm/s2'
 VOLUME_BECQUEREL = 'Bq/m3'
 VOLUME_PICOCURIE = 'pCi/L'
-ATM_METRIC_UNITS = 'hPa'
+ATM_METRIC_UNITS = 'mbar'
 CO2_METRIC_UNITS = 'ppm'
 VOC_METRIC_UNITS = 'ppb'
 
@@ -82,170 +81,117 @@ LOW = [50, 99, 'low']
 MODERATE = [100, 299, 'moderate']
 HIGH = [300, None, 'high']
 
-CHAR_UUID_DATETIME = UUID(0x2A08)
-CHAR_UUID_TEMPERATURE = UUID(0x2A6E)
-CHAR_UUID_HUMIDITY = UUID(0x2A6F)
-CHAR_UUID_RADON_1DAYAVG = 'b42e01aa-ade7-11e4-89d3-123b93f75cba'
-CHAR_UUID_RADON_LONG_TERM_AVG = 'b42e0a4c-ade7-11e4-89d3-123b93f75cba'
-CHAR_UUID_ILLUMINANCE_ACCELEROMETER = 'b42e1348-ade7-11e4-89d3-123b93f75cba'
-CHAR_UUID_WAVE_PLUS = 'b42e2a68-ade7-11e4-89d3-123b93f75cba'
 
-UNIT_SYSTEMS = [CONF_UNIT_SYSTEM_IMPERIAL, CONF_UNIT_SYSTEM_METRIC]
+DOMAIN = 'airthings'
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Required(CONF_MAC): cv.string,
-    vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
+    vol.Optional(CONF_MAC, default=''): cv.string,
     vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
-    vol.Optional(CONF_UNIT_SYSTEM): vol.In(UNIT_SYSTEMS),
-    vol.Optional('plus', default=False): cv.boolean,
 })
 
 
 class Sensor:
-    def __init__(self, name, uuid, format_type, scale):
-        self.name = name
-        self.uuid = uuid
-        self.format_type = format_type
-        self.scale = scale
+    def __init__(self, unit, unit_scale, device_class, icon):
+        self.unit = unit
+        self.unit_scale = unit_scale
+        self.device_class = device_class
+        self.icon = icon
+
+    def set_unit_scale(self, unit, unit_scale):
+        self.unit = unit
+        self.unit_scale = unit_scale
+
+    def get_extra_attributes(self, data):
+        return {}
 
 
-class AirthingsWave:
-    def __init__(self, name, mac):
-        self.name = name
-        self.mac = mac
-        self.sensors = []
-        self.sensors.append(Sensor('date_time', CHAR_UUID_DATETIME, 'HBBBBB', 0))
-        self.sensors.append(Sensor('temperature', CHAR_UUID_TEMPERATURE, 'h', 1.0/100.0))
-        self.sensors.append(Sensor('humidity', CHAR_UUID_HUMIDITY, 'H', 1.0/100.0))
-        self.sensors.append(Sensor('radon_1day_avg', CHAR_UUID_RADON_1DAYAVG, 'H', 1.0))
-        self.sensors.append(Sensor('radon_longterm_avg',
-            CHAR_UUID_RADON_LONG_TERM_AVG, 'H', 1.0))
-        self.sensors.append(Sensor('illuminance_accelerometer',
-            CHAR_UUID_ILLUMINANCE_ACCELEROMETER, 'BB', 1.0))
-
-        self.data = {'date_time': STATE_UNKNOWN, 'temperature': STATE_UNKNOWN,
-            'humidity': STATE_UNKNOWN, 'radon_1day_avg': STATE_UNKNOWN,
-            'radon_longterm_avg': STATE_UNKNOWN, 'illuminance': STATE_UNKNOWN,
-            'accelerometer' : STATE_UNKNOWN}
-
-    def get_data(self, connection):
-        for s in self.sensors:
-            val = struct.unpack(
-                s.format_type,
-                device.char_read(
-                    s.uuid, timeout=CONNECT_TIMEOUT))
-            _LOGGER.debug("Sensor %s: %s", s.name, val)
-
-            if s.name == 'date_time':
-                val = str(datetime(val[0], val[1], val[2], val[3],
-                                val[4], val[5]).isoformat())
-                self.data[s.name] = val
-
-            elif s.name == 'illuminance_accelerometer':
-                self.data['illuminance'] = str(val[0] * s.scale)
-                self.data['accelerometer'] = str(val[1] * s.scale)
-            else:
-                self.data[s.name] = str(round(val[0] * s.scale, 1))
+class RadonSensor(Sensor):
+    def get_extra_attributes(self, data):
+        if VERY_LOW[0] <= float(data) <= VERY_LOW[1]:
+            radon_level = VERY_LOW[2]
+        elif LOW[0] <= float(data) <= LOW[1]:
+            radon_level = LOW[2]
+        elif MODERATE[0] <= float(data) <= MODERATE[1]:
+            radon_level = MODERATE[2]
+        else:
+            radon_level = HIGH[2]
+        return {ATTR_RADON_LEVEL: radon_level}
 
 
-class AirthingsWavePlus:
-    def __init__(self, name, mac):
-        self.mac = mac
-        self.name = name
-        self.sensor = Sensor('wave_pluss', CHAR_UUID_WAVE_PLUS, 'BBBBHHHHHHHH', 0)
-
-        self.data = {'date_time': STATE_UNKNOWN, 'temperature': STATE_UNKNOWN,
-            'humidity': STATE_UNKNOWN, 'radon_1day_avg': STATE_UNKNOWN,
-            'radon_longterm_avg': STATE_UNKNOWN,
-            'accelerometer' : STATE_UNKNOWN, 'rel_atm_pressure' : STATE_UNKNOWN,
-            'co2' : STATE_UNKNOWN, 'voc' : STATE_UNKNOWN}
-
-    def get_data(self, connection):
-        _LOGGER.debug("Reading sensor %s", self.name)
-        data = connection.char_read_handle('0x000d',timeout=CONNECT_TIMEOUT)
-        _LOGGER.debug("Got raw data %s", data)
-        val = struct.unpack(
-            self.sensor.format_type,
-            data)
-        _LOGGER.debug("Sensor %s: %s", self.sensor.name, val)
-
-        self.data['date_time'] = str(datetime.isoformat(datetime.now()))
-        self.data['humidity'] = val[1]/2.0
-        self.data['radon_1day_avg'] = val[4] if 0 <= val[4] <= 16383 else STATE_UNKNOWN 
-        self.data['radon_longterm_avg'] = val[5] if 0 <= val[5] <= 16383 else STATE_UNKNOWN 
-        self.data['temperature'] = val[6]/100.0
-        self.data['rel_atm_pressure'] = val[7]/50.0
-        self.data['co2'] = val[8]*1.0
-        self.data['voc'] = val[9]*1.0
+DEVICE_SENSOR_SPECIFICS = {"date_time":Sensor('time', None, None, None),
+                           "temperature":Sensor(TEMP_CELSIUS, None, DEVICE_CLASS_TEMPERATURE, None),
+                           "humidity": Sensor(PERCENT, None, DEVICE_CLASS_HUMIDITY, None),
+                           "rel_atm_pressure": Sensor(ATM_METRIC_UNITS, None, DEVICE_CLASS_PRESSURE, None),
+                           "co2": Sensor(CO2_METRIC_UNITS, None, DEVICE_CLASS_CO2, 'mdi:periodic-table-co2'),
+                           "voc": Sensor(VOC_METRIC_UNITS, None, DEVICE_CLASS_VOC, 'mdi:cloud'),
+                           "illuminance": Sensor(ILLUMINANCE_LUX, None, DEVICE_CLASS_ILLUMINANCE, None),
+                           "accelerometer": Sensor(SPEED_METRIC_UNITS, None, DEVICE_CLASS_ACCELEROMETER, 'mdi:vibrate'),
+                            "radon_1day_avg": RadonSensor(VOLUME_BECQUEREL, None, DEVICE_CLASS_RADON, 'mdi:radioactive'),
+                            "radon_longterm_avg": RadonSensor(VOLUME_BECQUEREL, None, DEVICE_CLASS_RADON, 'mdi:radioactive')
+                           }
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the Airthings sensor."""
-    name = config.get(CONF_NAME)
+    scan_interval = config.get(CONF_SCAN_INTERVAL).total_seconds()
     mac = config.get(CONF_MAC)
-    scan_interval = config.get(CONF_SCAN_INTERVAL)
-    unit_system = config.get(CONF_UNIT_SYSTEM)
-    plus = config.get('plus')
+    mac = None if mac == '' else mac
 
-    if plus:
-        _LOGGER.debug("Setting up Wave Plus...")
-        device = AirthingsWavePlus(name, mac)
-    else:
-        _LOGGER.debug("Setting up Wave...")
-        device = AirthingsWave(name, mac)
+    if not hass.config.units.is_metric:
+        DEVICE_SENSOR_SPECIFICS["radon_1day_avg"].set_unit_scale(VOLUME_PICOCURIE, BQ_TO_PCI_MULTIPLIER)
+        DEVICE_SENSOR_SPECIFICS["radon_longterm_avg"].set_unit_scale(VOLUME_PICOCURIE, BQ_TO_PCI_MULTIPLIER)
 
-    if CONF_UNIT_SYSTEM in config:
-        unit_system = config[CONF_UNIT_SYSTEM]
-    elif hass.config.units.is_metric:
-        unit_system = UNIT_SYSTEMS[1]
-    else:
-        unit_system = UNIT_SYSTEMS[0]
+    _LOGGER.debug("Searching for Airthings sensors...")
+    airthingsdetect = AirthingsWaveDetect(scan_interval, mac)
+    try:
+        if mac is None:
+            num_devices_found = airthingsdetect.find_devices()
+            _LOGGER.info("Found {} airthings device(s)".format(num_devices_found))
 
-    mon = Monitor(hass, mac, device, scan_interval)
-    add_entities([AirthingsSensor(name + " Temperature", device, TEMPERATURE, TEMP_CELSIUS, 
-        {ATTR_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE})])
-    add_entities([AirthingsSensor(name + " Humidity", device, DEVICE_CLASS_HUMIDITY, PERCENT, 
-        {ATTR_DEVICE_CLASS: DEVICE_CLASS_HUMIDITY})])
-    add_entities([AirthingsRadon(name + " Radon 1 Day Average",
-        device, 'radon_1day_avg', unit_system)])
-    add_entities([AirthingsRadon(name + " Radon Long Term Average",
-        device, 'radon_longterm_avg', unit_system)])
-    if plus:
-        add_entities([AirthingsSensor(name + " RelATMPressure", device, 'rel_atm_pressure', 
-            ATM_METRIC_UNITS, {ATTR_DEVICE_CLASS: DEVICE_CLASS_PRESSURE})])
-        add_entities([AirthingsSensor(name + " Co2", device, 'co2', CO2_METRIC_UNITS, 
-            {ATTR_DEVICE_CLASS: DEVICE_CLASS_CO2,
-             ATTR_ICON: 'mdi:periodic-table-co2'})])
-        add_entities([AirthingsSensor(name + " Voc", device, 'voc', VOC_METRIC_UNITS, 
-            {ATTR_DEVICE_CLASS: DEVICE_CLASS_VOC,
-             ATTR_ICON: 'mdi:cloud'})])
-    else:
-        add_entities([AirthingsSensor(name + " Illuminance", device, ILLUMINANCE, ILLUMINANCE_LUX, 
-            {ATTR_DEVICE_CLASS: DEVICE_CLASS_ILLUMINANCE})])
-        add_entities([AirthingsSensor(name + " Acceleration", device, 'accelerometer', SPEED_METRIC_UNITS,
-            {ATTR_DEVICE_CLASS: DEVICE_CLASS_ACCELEROMETER,
-             ATTR_ICON: 'mdi:vibrate'})])
+        if mac is None and num_devices_found == 0:
+            _LOGGER.warning("No airthings devices found.")
+            return
 
+        _LOGGER.debug("Getting info about device(s)")
+        devices_info = airthingsdetect.get_info()
+        for mac, dev in devices_info.items():
+            _LOGGER.info("{}: {}".format(mac, dev))
 
-    def monitor_stop(_service_or_event):
-        """Stop the monitor thread."""
-        _LOGGER.info("Stopping monitor for %s", name)
-        mon.terminate()
+        _LOGGER.debug("Getting sensors")
+        devices_sensors = airthingsdetect.get_sensors()
+        for mac, sensors in devices_sensors.items():
+            for sensor in sensors:
+                _LOGGER.debug("{}: Found sensor UUID: {} Handle: {}".format(mac, sensor.uuid, sensor.handle))
 
-    hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, monitor_stop)
-    mon.start()
+        _LOGGER.debug("Get initial sensor data to populate HA entities")
+        ha_entities = []
+        sensordata = airthingsdetect.get_sensor_data()
+        for mac, data in sensordata.items():
+            for name, val in data.items():
+                _LOGGER.debug("{}: {}: {}".format(mac, name, val))
+                ha_entities.append(AirthingsSensor(mac, name, airthingsdetect, devices_info[mac],
+                                                   DEVICE_SENSOR_SPECIFICS[name]))
+    except:
+        _LOGGER.exception()
+        return
+
+    add_entities(ha_entities, True)
 
 
 class AirthingsSensor(Entity):
-    """General Representation of a Airthings sensor."""
-    def __init__(self, name, device, device_class, unit, device_attributes):
+    """General Representation of an Airthings sensor."""
+    def __init__(self, mac, name, device, device_info, sensor_specifics):
         """Initialize a sensor."""
-        _LOGGER.debug("Added sensor entity %s", name)
         self.device = device
-        self._name = name
-        self._device_class = device_class
-        self._unit = unit
-        self._device_attributes = device_attributes
+        self._mac = mac
+        self._name = '{}-{}-{}'.format(device_info.device_name, device_info.serial_nr, name)
+        self._unique_name = '{}-{}'.format(device_info.serial_nr, name)
+        _LOGGER.debug("Added sensor entity {}".format(self._unique_name))
+        self._sensor_name = name
+
+        self._device_class = sensor_specifics.device_class
+        self._state = STATE_UNKNOWN
+        self._sensor_specifics = sensor_specifics
 
     @property
     def name(self):
@@ -255,130 +201,42 @@ class AirthingsSensor(Entity):
     @property
     def state(self):
         """Return the state of the device."""
-        return self.device.data[self._device_class]
+        return self._state
+
+    @property
+    def icon(self):
+        """Return the icon of the sensor."""
+        return self._sensor_specifics.icon
+
+    @property
+    def device_class(self):
+        """Return the icon of the sensor."""
+        return self._sensor_specifics.device_class
 
     @property
     def unit_of_measurement(self):
         """Return the unit the value is expressed in."""
-        return self._unit
+        return self._sensor_specifics.unit
+
+    @property
+    def unique_id(self):
+        return self._unique_name
 
     @property
     def device_state_attributes(self):
         """Return the state attributes of the sensor."""
-        self._device_attributes.update({ATTR_DEVICE_DATE_TIME: self.device.data['date_time']})
-        return self._device_attributes
+        attributes = self._sensor_specifics.get_extra_attributes(self._state)
+        attributes[ATTR_DEVICE_DATE_TIME] = self.device.sensordata[self._mac]['date_time']
+        return attributes
 
-
-class AirthingsRadon(Entity):
-    """Representation of a Airthings radon sensor."""
-
-    def __init__(self, name, device, subclass, unit_system):
-        """Initialize a sensor."""
-        self.device = device
-        self._subclass = subclass
-        self._name = name
-        self.radon_level = STATE_UNKNOWN
-        self.unit_system = unit_system
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self):
-        """Return the state of the device."""
-        try:
-            if self.unit_system == CONF_UNIT_SYSTEM_IMPERIAL:
-                self.converted_radon_data = round(
-                    float(self.device.data[self._subclass]) *
-                        BQ_TO_PCI_MULTIPLIER, 2)
-            else:
-                self.converted_radon_data = self.device.data[self._subclass]
-
-        except Exception as ex:
-            _LOGGER.warn("Radon data is : got an exception: %s", ex)
-            self.converted_radon_data = self.device.data[self._subclass]
-
-        return self.converted_radon_data
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit the value is expressed in."""
-        if (self.unit_system == CONF_UNIT_SYSTEM_IMPERIAL) :
-            return VOLUME_PICOCURIE
-        else :
-            return VOLUME_BECQUEREL
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes of the sensor."""
-
-        try:
-            if VERY_LOW[0] <= float(self.device.data[self._subclass]) <= VERY_LOW[1]:
-                self.radon_level = VERY_LOW[2]
-            elif LOW[0] <= float(self.device.data[self._subclass]) <= LOW[1]:
-                self.radon_level = LOW[2]
-            elif MODERATE[0] <= float(self.device.data[self._subclass]) <= MODERATE[1]:
-                self.radon_level = MODERATE[2]
-            else:
-                self.radon_level = HIGH[2]
-        except Exception as ex:
-            _LOGGER.warn("Radon level is : got an exception: %s", ex)
-            self.radon_level = STATE_UNKNOWN
-
-        return {
-            ATTR_DEVICE_CLASS: DEVICE_CLASS_RADON,
-            ATTR_DEVICE_DATE_TIME: self.device.data['date_time'],
-            ATTR_RADON_LEVEL: self.radon_level,
-            ATTR_ICON: 'mdi:radioactive'
-        }
-
-
-class Monitor(threading.Thread):
-    """Connection handling."""
-
-    def __init__(self, hass, mac, device, scan_interval):
-        """Construct interface object."""
-        threading.Thread.__init__(self)
-        self.daemon = False
-        self.hass = hass
-        self.mac = mac
-        self.device = device
-        self.scan_interval = scan_interval
-
-        self.keep_going = True
-        self.event = threading.Event()
-
-    def run(self):
-        """Thread that keeps connection alive."""
-        # pylint: disable=import-error
-        import pygatt
-        from pygatt.exceptions import (
-            BLEError, NotConnectedError, NotificationTimeout)
-
-        adapter = pygatt.backends.GATTToolBackend()
-        while self.keep_going:
-            try:
-                _LOGGER.debug("Connecting to %s", self.name)
-
-                # We need concurrent connect, so lets not reset the device
-                adapter.start(reset_on_start=False)
-                connection = adapter.connect(self.mac, CONNECT_TIMEOUT)
-
-                # Give the adaptor a breather
-                self.event.wait(1)
-                self.device.get_data(connection)
-
-            except (BLEError, NotConnectedError, NotificationTimeout) as ex:
-                _LOGGER.error("Exception: %s ", str(ex))
-            finally:
-                adapter.stop()
-                self.event.wait(self.scan_interval.total_seconds())
-
-    def terminate(self):
-        """Signal runner to stop and join thread."""
-        _LOGGER.debug("Terminating the thread")
-        self.keep_going = False
-        self.event.set()
-        self.join()
+    def update(self):
+        """Fetch new state data for the sensor.
+        This is the only method that should fetch new data for Home Assistant.
+        """
+        self.device.get_sensor_data()
+        value = self.device.sensordata[self._mac][self._sensor_name]
+        if self._sensor_specifics.unit_scale is None:
+            self._state = value
+        else:
+            self._state = round(float(value * self._sensor_specifics.unit_scale, 2))
+        _LOGGER.debug("State {} {}".format(self._name, self._state))
