@@ -172,7 +172,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                 ha_entities.append(AirthingsSensor(mac, name, airthingsdetect, devices_info[mac],
                                                    DEVICE_SENSOR_SPECIFICS[name]))
     except:
-        _LOGGER.exception()
+        _LOGGER.exception("Failed intial setup.")
         return
 
     add_entities(ha_entities, True)
