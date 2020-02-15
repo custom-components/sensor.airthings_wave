@@ -184,8 +184,7 @@ class AirthingsSensor(Entity):
         """Initialize a sensor."""
         self.device = device
         self._mac = mac
-        self._name = '{}-{}-{}'.format(device_info.device_name, device_info.serial_nr, name)
-        self._unique_name = '{}-{}'.format(device_info.serial_nr, name)
+        self._name = '{}-{}'.format(mac, name)
         _LOGGER.debug("Added sensor entity {}".format(self._unique_name))
         self._sensor_name = name
 
@@ -220,13 +219,16 @@ class AirthingsSensor(Entity):
 
     @property
     def unique_id(self):
-        return self._unique_name
+        return self._name
 
     @property
     def device_state_attributes(self):
         """Return the state attributes of the sensor."""
         attributes = self._sensor_specifics.get_extra_attributes(self._state)
-        attributes[ATTR_DEVICE_DATE_TIME] = self.device.sensordata[self._mac]['date_time']
+        try:
+            attributes[ATTR_DEVICE_DATE_TIME] = self.device.sensordata[self._mac]['date_time']
+        except KeyError:
+            _LOGGER.exception("No date time of sensor reading data available.")
         return attributes
 
     def update(self):
