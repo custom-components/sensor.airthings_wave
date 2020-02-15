@@ -45,7 +45,8 @@ class AirthingsDeviceInfo:
         return "Manufacturer: {} Model: {} Serial: {} Device:{}".format(
             self.manufacturer, self.model_nr, self.serial_nr, self.device_name)
 
-sensors_characteristics_uuid = [CHAR_UUID_TEMPERATURE, CHAR_UUID_HUMIDITY, CHAR_UUID_RADON_1DAYAVG,
+
+sensors_characteristics_uuid = [CHAR_UUID_DATETIME, CHAR_UUID_TEMPERATURE, CHAR_UUID_HUMIDITY, CHAR_UUID_RADON_1DAYAVG,
                                 CHAR_UUID_RADON_LONG_TERM_AVG, CHAR_UUID_ILLUMINANCE_ACCELEROMETER,
                                 CHAR_UUID_WAVE_PLUS_DATA]
 
