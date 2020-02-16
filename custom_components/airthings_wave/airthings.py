@@ -203,7 +203,7 @@ class AirthingsWaveDetect:
                             if characteristic.uuid in sensor_decoders:
                                 sensor_data = sensor_decoders[characteristic.uuid].decode_data(data)
                                 _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
-                                self.sensordata[mac] = sensor_data
+                                self.sensordata[mac].update(sensor_data)
                         except (BLEError, NotConnectedError, NotificationTimeout):
                             _LOGGER.exception("Failed to read characteristic")
 
