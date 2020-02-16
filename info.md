@@ -11,33 +11,48 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-hassio support for Airthings Wave BLE environmental radon sensor.
+hassio support for Airthings Wave and Airthings Wave Plus BLE environmental radon sensors.
 
 ![ScreenShot](ScreenShot.png)
 
+Much of the code to build this component was inspired by these projects:
+* http://airthings.com/raspberry-pi/
+* https://github.com/marcelm/radonwave
+
+The aforementioned `radonwave` project is especially useful as it describes
+many of the BLE characteristics specific to this product and has good
+trouble-shooting tips. The script provided is also very useful in determining
+the MAC address of your AW device. See here:
+https://github.com/marcelm/radonwave/issues/3
+
+## Getting started
+
+Download
+```
+/custom_components/airthings_wave/
+```
+into
+```
+<config directory>/custom_components/airthings_wave/
+```
 **Example configuration.yaml:**
 
 ```yaml
 # Example configuration.yaml entry
 sensor:
   - platform: airthings_wave
-    mac: "98:07:2D:4A:97:5C"
-    name: 'Basement Airthings Wave'
     scan_interval: 120
 ```
 ### Configuration Variables
 
 **mac**
 
-  (string)(Required) The airthings_wave mac address
-
-**name**
-
-  (string)(Optional) The name of the device. Defaults to 'Airthings Wave'
+  (string)(Optional) The airthings_wave mac address, if not provided will scan for all airthings devices at startup
 
 **scan_interval**
 
   (string)(Optional) The interval between polls. Defaults to 300 seconds (5 minutes)
+
 
 ## Limitations
 
@@ -54,12 +69,6 @@ first.
 
 ## Known Issues
 
-* Note yet compatible with Airthings Wave __Plus__
-
-* Values only appear after first scan_interval (default 5 minutes) has passed
-and will remain as `unknown` until then
-https://github.com/custom-components/sensor.airthings_wave/issues/2
-
 * Not yet able to specify the `monitored_conditions` configuration
 
 * No translations available yet
@@ -67,9 +76,9 @@ https://github.com/custom-components/sensor.airthings_wave/issues/2
 
 ## Hardware Requirements
 
-* An Airthings Wave
+* An Airthings Wave __OR__ Airthings Wave Plus
 
-* A Raspberry Pi 3 with built-in Bluetooth __OR__ a Bluetooth adapter that supports Bluetooth Low Energy (BLE). such as this
+* A Raspberry Pi 3/4 with built-in Bluetooth __OR__ a Bluetooth adapter that supports Bluetooth Low Energy (BLE). such as this
 one: https://www.amazon.com/dp/B01N5MGEUS/ref=cm_sw_r_tw_dp_U_x_ObdNCb03P7QZJ
 
 ## Other Resources
