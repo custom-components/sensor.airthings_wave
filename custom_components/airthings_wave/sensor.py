@@ -185,7 +185,7 @@ class AirthingsSensor(Entity):
         self.device = device
         self._mac = mac
         self._name = '{}-{}'.format(mac, name)
-        _LOGGER.debug("Added sensor entity {}".format(self._unique_name))
+        _LOGGER.debug("Added sensor entity {}".format(self._name))
         self._sensor_name = name
 
         self._device_class = sensor_specifics.device_class
