@@ -141,10 +141,12 @@ class AirthingsWaveDetect:
                         self.airthing_devices.append(mac)
                 except (BLEError, NotConnectedError, NotificationTimeout):
                     _LOGGER.debug("connection to {} failed".format(mac))
-                dev.disconnect()
+                finally:
+                    dev.disconnect()
             except (BLEError, NotConnectedError, NotificationTimeout):
                 _LOGGER.debug("Faild to connect")
-            self.adapter.stop()
+            finally:
+                self.adapter.stop()
 
         _LOGGER.debug("Found {} airthings devices".format(len(self.airthing_devices)))
         return len(self.airthing_devices)

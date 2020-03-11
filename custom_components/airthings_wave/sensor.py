@@ -13,7 +13,6 @@ For more details about this platform, please refer to the documentation at
 https://home-assistant.io/components/sensor.airthings_wave/
 """
 import logging
-import threading
 from datetime import timedelta
 
 from .airthings import AirthingsWaveDetect
@@ -33,13 +32,8 @@ from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  EVENT_HOMEASSISTANT_STOP, ILLUMINANCE,
                                  STATE_UNKNOWN)
 from homeassistant.helpers.entity import Entity
-VERSION = '0.5.0'
-
-REQUIREMENTS = ['pygatt[GATTTOOL]==4.0.3']
 
 _LOGGER = logging.getLogger(__name__)
-DEFAULT_NAME = 'Airthings Wave'
-CONNECT_LOCK = threading.Lock()
 CONNECT_TIMEOUT = 30
 SCAN_INTERVAL = timedelta(seconds=300)
 
@@ -118,14 +112,14 @@ class RadonSensor(Sensor):
         return {ATTR_RADON_LEVEL: radon_level}
 
 
-DEVICE_SENSOR_SPECIFICS = {"date_time":Sensor('time', None, None, None),
-                           "temperature":Sensor(TEMP_CELSIUS, None, DEVICE_CLASS_TEMPERATURE, None),
-                           "humidity": Sensor(PERCENT, None, DEVICE_CLASS_HUMIDITY, None),
-                           "rel_atm_pressure": Sensor(ATM_METRIC_UNITS, None, DEVICE_CLASS_PRESSURE, None),
-                           "co2": Sensor(CO2_METRIC_UNITS, None, DEVICE_CLASS_CO2, 'mdi:periodic-table-co2'),
-                           "voc": Sensor(VOC_METRIC_UNITS, None, DEVICE_CLASS_VOC, 'mdi:cloud'),
-                           "illuminance": Sensor(ILLUMINANCE_LUX, None, DEVICE_CLASS_ILLUMINANCE, None),
-                           "accelerometer": Sensor(SPEED_METRIC_UNITS, None, DEVICE_CLASS_ACCELEROMETER, 'mdi:vibrate'),
+DEVICE_SENSOR_SPECIFICS = { "date_time":Sensor('time', None, None, None),
+                            "temperature":Sensor(TEMP_CELSIUS, None, DEVICE_CLASS_TEMPERATURE, None),
+                            "humidity": Sensor(PERCENT, None, DEVICE_CLASS_HUMIDITY, None),
+                            "rel_atm_pressure": Sensor(ATM_METRIC_UNITS, None, DEVICE_CLASS_PRESSURE, None),
+                            "co2": Sensor(CO2_METRIC_UNITS, None, DEVICE_CLASS_CO2, 'mdi:periodic-table-co2'),
+                            "voc": Sensor(VOC_METRIC_UNITS, None, DEVICE_CLASS_VOC, 'mdi:cloud'),
+                            "illuminance": Sensor(ILLUMINANCE_LUX, None, DEVICE_CLASS_ILLUMINANCE, None),
+                            "accelerometer": Sensor(SPEED_METRIC_UNITS, None, DEVICE_CLASS_ACCELEROMETER, 'mdi:vibrate'),
                             "radon_1day_avg": RadonSensor(VOLUME_BECQUEREL, None, DEVICE_CLASS_RADON, 'mdi:radioactive'),
                             "radon_longterm_avg": RadonSensor(VOLUME_BECQUEREL, None, DEVICE_CLASS_RADON, 'mdi:radioactive')
                            }

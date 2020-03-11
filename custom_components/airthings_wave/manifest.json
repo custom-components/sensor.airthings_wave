@@ -5,6 +5,6 @@
   "dependencies": [],
   "codeowners": ["@MartyTremblay"],
   "requirements": [
-    "pygatt[GATTTOOL]==4.0.3"
+    "pygatt[GATTTOOL]==4.0.5"
   ]
 }
