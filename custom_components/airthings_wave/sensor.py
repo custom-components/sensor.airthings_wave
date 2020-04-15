@@ -234,5 +234,5 @@ class AirthingsSensor(Entity):
         if self._sensor_specifics.unit_scale is None:
             self._state = value
         else:
-            self._state = round(float(value * self._sensor_specifics.unit_scale, 2))
+            self._state = round(float(value * self._sensor_specifics.unit_scale), 2)
         _LOGGER.debug("State {} {}".format(self._name, self._state))
