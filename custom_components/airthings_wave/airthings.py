@@ -25,6 +25,7 @@ CHAR_UUID_RADON_1DAYAVG = UUID('b42e01aa-ade7-11e4-89d3-123b93f75cba')
 CHAR_UUID_RADON_LONG_TERM_AVG = UUID('b42e0a4c-ade7-11e4-89d3-123b93f75cba')
 CHAR_UUID_ILLUMINANCE_ACCELEROMETER = UUID('b42e1348-ade7-11e4-89d3-123b93f75cba')
 CHAR_UUID_WAVE_PLUS_DATA = UUID('b42e2a68-ade7-11e4-89d3-123b93f75cba')
+CHAR_UUID_WAVE_2_DATA = UUID('b42e4dcc-ade7-11e4-89d3-123b93f75cba')
 
 Characteristic = namedtuple('Characteristic', ['uuid', 'name', 'format'])
 
@@ -48,7 +49,7 @@ class AirthingsDeviceInfo:
 
 sensors_characteristics_uuid = [CHAR_UUID_DATETIME, CHAR_UUID_TEMPERATURE, CHAR_UUID_HUMIDITY, CHAR_UUID_RADON_1DAYAVG,
                                 CHAR_UUID_RADON_LONG_TERM_AVG, CHAR_UUID_ILLUMINANCE_ACCELEROMETER,
-                                CHAR_UUID_WAVE_PLUS_DATA]
+                                CHAR_UUID_WAVE_PLUS_DATA,CHAR_UUID_WAVE_2_DATA]
 
 sensors_characteristics_uuid_str = [str(x) for x in sensors_characteristics_uuid]
 
@@ -86,6 +87,21 @@ class WavePlussDecode(BaseDecode):
         return data
 
 
+class Wave2Decode(BaseDecode):
+    def decode_data(self, raw_data):
+        val = super().decode_data(raw_data)
+        val = val[self.name]
+        # if val[0] != 1:
+        #     raise ValueError("Incompatible current values version (Expected 1, got {})".format(data[0]))
+        data = {}
+        data['date_time'] = str(datetime.isoformat(datetime.now()))
+        data['humidity'] = val[1]/2.0
+        data['radon_1day_avg'] = val[4] if 0 <= val[4] <= 16383 else None
+        data['radon_longterm_avg'] = val[5] if 0 <= val[5] <= 16383 else None
+        data['temperature'] = val[6]/100.0
+        return data
+
+
 class WaveDecodeDate(BaseDecode):
     def decode_data(self, raw_data):
         val = super().decode_data(raw_data)[self.name]
@@ -108,7 +124,8 @@ sensor_decoders = {str(CHAR_UUID_WAVE_PLUS_DATA):WavePlussDecode(name="Pluss", f
                    str(CHAR_UUID_RADON_1DAYAVG):BaseDecode(name="radon_1day_avg", format_type='H', scale=1.0),
                    str(CHAR_UUID_RADON_LONG_TERM_AVG):BaseDecode(name="radon_longterm_avg", format_type='H', scale=1.0),
                    str(CHAR_UUID_ILLUMINANCE_ACCELEROMETER):WaveDecodeIluminAccel(name="illuminance_accelerometer", format_type='BB', scale=1.0),
-                   str(CHAR_UUID_TEMPERATURE):BaseDecode(name="temperature", format_type='h', scale=1.0/100.0),}
+                   str(CHAR_UUID_TEMPERATURE):BaseDecode(name="temperature", format_type='h', scale=1.0/100.0),
+                   str(CHAR_UUID_WAVE_2_DATA):Wave2Decode(name="Wave2", format_type='<4B8H', scale=1.0),}
 
 
 class AirthingsWaveDetect:
