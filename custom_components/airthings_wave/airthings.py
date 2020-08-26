@@ -91,8 +91,6 @@ class Wave2Decode(BaseDecode):
     def decode_data(self, raw_data):
         val = super().decode_data(raw_data)
         val = val[self.name]
-        # if val[0] != 1:
-        #     raise ValueError("Incompatible current values version (Expected 1, got {})".format(data[0]))
         data = {}
         data['date_time'] = str(datetime.isoformat(datetime.now()))
         data['humidity'] = val[1]/2.0
