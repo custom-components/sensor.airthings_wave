@@ -11,7 +11,7 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-hassio support for Airthings Wave and Airthings Wave Plus BLE environmental radon sensors.
+hassio support for Airthings Wave, Airthings Wave Plus, and Airthings Wave Mini BLE environmental sensors.
 
 ![ScreenShot](ScreenShot.png)
 
@@ -43,7 +43,7 @@ sensor:
   - platform: airthings_wave
     scan_interval: 120
 ```
-### Configuration Variables
+### Optional Configuration Variables
 
 **mac**
 
@@ -76,7 +76,7 @@ first.
 
 ## Hardware Requirements
 
-* An Airthings Wave __OR__ Airthings Wave Plus
+* An Airthings Wave __OR__ Airthings Wave Plus __OR__ Airthings Wave Mini
 
 * A Raspberry Pi 3/4 with built-in Bluetooth __OR__ a Bluetooth adapter that supports Bluetooth Low Energy (BLE). such as this
 one: https://www.amazon.com/dp/B01N5MGEUS/ref=cm_sw_r_tw_dp_U_x_ObdNCb03P7QZJ
