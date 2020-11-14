@@ -123,6 +123,7 @@ class PressureSensor(Sensor):
         R0 = 8.314462618  # J/(mol K)
         h = self.parameters['elevation']  # m
         self.offset = (p0 - (p0 * exp(-g * h * M / (T0 * R0))))/100.0  # mbar
+        self.offset = round(self.offset, 2)
 
     def transform(self, value):
         value = super().transform(value) + self.offset
