@@ -42,8 +42,13 @@ into
 sensor:
   - platform: airthings_wave
     scan_interval: 120
+    elevation: 998
 ```
 ### Optional Configuration Variables
+
+**elevation**
+
+  (float)(Optional) The current elevation. Used to correct the pressure sensor to sea level conditions.
 
 **mac**
 
