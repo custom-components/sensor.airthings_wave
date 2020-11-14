@@ -46,10 +46,6 @@ sensor:
 ```
 ### Optional Configuration Variables
 
-**elevation**
-
-  (float)(Optional) The current elevation. Used to correct the pressure sensor to sea level conditions.
-
 **mac**
 
   (string)(Optional) The airthings_wave mac address, if not provided will scan for all airthings devices at startup
@@ -57,6 +53,10 @@ sensor:
 **scan_interval**
 
   (string)(Optional) The interval between polls. Defaults to 300 seconds (5 minutes)
+
+**elevation**
+
+  (float)(Optional) The current elevation in meters. Used to correct the pressure sensor to sea level conditions.
 
 
 ## Limitations
