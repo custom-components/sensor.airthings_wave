@@ -82,7 +82,7 @@ DOMAIN = 'airthings'
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_MAC, default=''): cv.string,
     vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
-    vol.Optional(CONF_ELEVATION, default=0): vol.Any(None, float)
+    vol.Optional(CONF_ELEVATION, default=0): vol.Any(vol.Coerce(float), None)
 })
 
 
@@ -126,6 +126,7 @@ class PressureSensor(Sensor):
 
     def transform(self, value):
         value = super().transform(value) + self.offset
+        return value
 
 
 class RadonSensor(Sensor):
