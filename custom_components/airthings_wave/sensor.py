@@ -82,7 +82,7 @@ DOMAIN = 'airthings'
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_MAC, default=''): cv.string,
     vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
-    vol.Optional(CONF_ELEVATION, default=0): float
+    vol.Optional(CONF_ELEVATION, default=0): vol.Any(None, float)
 })
 
 
@@ -101,7 +101,7 @@ class Sensor:
         self.unit_scale = unit_scale
 
     def transform(self, value):
-        if self.unit_scale == None:
+        if self.unit_scale is None:
             return value
         return round(float(value * self.unit_scale), 2)
 
@@ -160,7 +160,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     mac = config.get(CONF_MAC)
     mac = None if mac == '' else mac
 
-    elevation = config.get(CONF_ELEVATION)
+    elevation = config.get(CONF_ELEVATION) or 0.0
     DEVICE_SENSOR_SPECIFICS["rel_atm_pressure"].set_parameters(
         {'elevation': elevation})
 
