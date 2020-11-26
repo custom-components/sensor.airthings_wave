@@ -42,6 +42,7 @@ into
 sensor:
   - platform: airthings_wave
     scan_interval: 120
+    elevation: 998
 ```
 ### Optional Configuration Variables
 
@@ -52,6 +53,10 @@ sensor:
 **scan_interval**
 
   (string)(Optional) The interval between polls. Defaults to 300 seconds (5 minutes)
+
+**elevation**
+
+  (float)(Optional) The current elevation in meters. Used to correct the pressure sensor to sea level conditions.
 
 
 ## Limitations

@@ -14,6 +14,7 @@ https://home-assistant.io/components/sensor.airthings_wave/
 """
 import logging
 from datetime import timedelta
+from math import exp
 
 from .airthings import AirthingsWaveDetect
 
@@ -21,7 +22,7 @@ import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
-                                 CONF_NAME, CONF_SCAN_INTERVAL,
+                                 CONF_NAME, CONF_SCAN_INTERVAL, CONF_ELEVATION,
                                  CONF_UNIT_SYSTEM, CONF_UNIT_SYSTEM_IMPERIAL,
                                  CONF_UNIT_SYSTEM_METRIC, TEMPERATURE,
                                  TEMP_CELSIUS, DEVICE_CLASS_HUMIDITY,
@@ -81,6 +82,7 @@ DOMAIN = 'airthings'
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_MAC, default=''): cv.string,
     vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
+    vol.Optional(CONF_ELEVATION, default=0): vol.Any(vol.Coerce(float), None)
 })
 
 
@@ -91,12 +93,41 @@ class Sensor:
         self.device_class = device_class
         self.icon = icon
 
+    def set_parameters(self, parameters):
+        self.parameters = parameters
+
     def set_unit_scale(self, unit, unit_scale):
         self.unit = unit
         self.unit_scale = unit_scale
 
+    def transform(self, value):
+        if self.unit_scale is None:
+            return value
+        return round(float(value * self.unit_scale), 2)
+
     def get_extra_attributes(self, data):
         return {}
+
+
+class PressureSensor(Sensor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.offset = 0
+
+    def set_parameters(self, parameters):
+        super().set_parameters(parameters)
+        p0 = 101325   # Pa
+        g = 9.80665  # m/s^2
+        M = 0.02896968  # kg/mol
+        T0 = 288.16  # K
+        R0 = 8.314462618  # J/(mol K)
+        h = self.parameters['elevation']  # m
+        self.offset = (p0 - (p0 * exp(-g * h * M / (T0 * R0))))/100.0  # mbar
+        self.offset = round(self.offset, 2)
+
+    def transform(self, value):
+        value = super().transform(value) + self.offset
+        return value
 
 
 class RadonSensor(Sensor):
@@ -115,7 +146,7 @@ class RadonSensor(Sensor):
 DEVICE_SENSOR_SPECIFICS = { "date_time":Sensor('time', None, None, None),
                             "temperature":Sensor(TEMP_CELSIUS, None, DEVICE_CLASS_TEMPERATURE, None),
                             "humidity": Sensor(PERCENT, None, DEVICE_CLASS_HUMIDITY, None),
-                            "rel_atm_pressure": Sensor(ATM_METRIC_UNITS, None, DEVICE_CLASS_PRESSURE, None),
+                            "rel_atm_pressure": PressureSensor(ATM_METRIC_UNITS, None, DEVICE_CLASS_PRESSURE, None),
                             "co2": Sensor(CO2_METRIC_UNITS, None, DEVICE_CLASS_CO2, 'mdi:molecule-co2'),
                             "voc": Sensor(VOC_METRIC_UNITS, None, DEVICE_CLASS_VOC, 'mdi:cloud'),
                             "illuminance": Sensor(ILLUMINANCE_LUX, None, DEVICE_CLASS_ILLUMINANCE, None),
@@ -131,9 +162,14 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     mac = config.get(CONF_MAC)
     mac = None if mac == '' else mac
 
+    elevation = config.get(CONF_ELEVATION) or 0.0
+    DEVICE_SENSOR_SPECIFICS["rel_atm_pressure"].set_parameters(
+        {'elevation': elevation})
+
     if not hass.config.units.is_metric:
         DEVICE_SENSOR_SPECIFICS["radon_1day_avg"].set_unit_scale(VOLUME_PICOCURIE, BQ_TO_PCI_MULTIPLIER)
         DEVICE_SENSOR_SPECIFICS["radon_longterm_avg"].set_unit_scale(VOLUME_PICOCURIE, BQ_TO_PCI_MULTIPLIER)
+
 
     _LOGGER.debug("Searching for Airthings sensors...")
     airthingsdetect = AirthingsWaveDetect(scan_interval, mac)
@@ -231,8 +267,5 @@ class AirthingsSensor(Entity):
         """
         self.device.get_sensor_data()
         value = self.device.sensordata[self._mac][self._sensor_name]
-        if self._sensor_specifics.unit_scale is None:
-            self._state = value
-        else:
-            self._state = round(float(value * self._sensor_specifics.unit_scale), 2)
+        self._state = self._sensor_specifics.transform(value)
         _LOGGER.debug("State {} {}".format(self._name, self._state))
