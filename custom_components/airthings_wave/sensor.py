@@ -132,11 +132,11 @@ class PressureSensor(Sensor):
 
 class RadonSensor(Sensor):
     def get_extra_attributes(self, data):
-        if VERY_LOW[0] <= float(data) <= VERY_LOW[1]:
+        if float(data) <= self.transform(VERY_LOW[1]):
             radon_level = VERY_LOW[2]
-        elif LOW[0] <= float(data) <= LOW[1]:
+        elif float(data) <= self.transform(LOW[1]):
             radon_level = LOW[2]
-        elif MODERATE[0] <= float(data) <= MODERATE[1]:
+        elif float(data) <= self.transform(MODERATE[1]):
             radon_level = MODERATE[2]
         else:
             radon_level = HIGH[2]
