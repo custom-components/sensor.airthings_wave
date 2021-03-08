@@ -1,7 +1,9 @@
 {
   "domain": "airthings_wave",
   "name": "Airthings Wave",
+  "version": "2.9.1",
   "documentation": "https://github.com/custom-components/sensor.airthings_wave/",
+  "issue_tracker": "https://github.com/custom-components/sensor.airthings_wave/issues",
   "dependencies": [],
   "codeowners": ["@MartyTremblay"],
   "requirements": [
