@@ -5,9 +5,8 @@ from collections import namedtuple
 import logging
 from datetime import datetime
 
-import pygatt
-from pygatt.exceptions import (
-    BLEError, NotConnectedError, NotificationTimeout)
+import bluepy.btle as btle
+
 
 from uuid import UUID
 
@@ -142,7 +141,6 @@ sensor_decoders = {str(CHAR_UUID_WAVE_PLUS_DATA):WavePlussDecode(name="Pluss", f
 
 class AirthingsWaveDetect:
     def __init__(self, scan_interval, mac=None):
-        self.adapter = pygatt.backends.GATTToolBackend()
         self.airthing_devices = [] if mac is None else [mac]
         self.sensors = []
         self.sensordata = {}
@@ -150,109 +148,105 @@ class AirthingsWaveDetect:
         self.last_scan = -1
 
 
-    def find_devices(self):
-        # Scan for devices and try to figure out if it is an airthings device.
-        self.adapter.start(reset_on_start=False)
-        devices = self.adapter.scan(timeout=3)
-        self.adapter.stop()
+    def _parse_serial_number(self, manufacturer_data):
+        try:
+            #print(manufacturer_data)
+            (ID, SN, _) = struct.unpack("<HLH", manufacturer_data)
+        except Exception as e:  # Return None for non-Airthings devices
+            return None
+        else:  # Executes only if try-block succeeds
+            if ID == 0x0334:
+                return SN
 
-        for device in devices:
-            mac = device['address']
-            _LOGGER.debug("connecting to {}".format(mac))
-            try:
-                self.adapter.start(reset_on_start=False)
-                dev = self.adapter.connect(mac, 3)
-                _LOGGER.debug("Connected")
-                try:
-                    data = dev.char_read(manufacturer_characteristics.uuid)
-                    manufacturer_name = data.decode(manufacturer_characteristics.format)
-                    if "airthings" in manufacturer_name.lower():
-                        self.airthing_devices.append(mac)
-                except (BLEError, NotConnectedError, NotificationTimeout):
-                    _LOGGER.debug("connection to {} failed".format(mac))
-                finally:
-                    dev.disconnect()
-            except (BLEError, NotConnectedError, NotificationTimeout):
-                _LOGGER.debug("Faild to connect")
-            finally:
-                self.adapter.stop()
+    def find_devices(self, scanns=10):
+        scanner = btle.Scanner()
+        for _count in range(scanns):
+            advertisements = scanner.scan(0.1)
+            for adv in advertisements:
+                sn = self._parse_serial_number(adv.getValue(btle.ScanEntry.MANUFACTURER))
+                if sn is not None:
+                    if adv.addr not in self.airthing_devices:
+                        self.airthing_devices.append(adv.addr)
 
         _LOGGER.debug("Found {} airthings devices".format(len(self.airthing_devices)))
         return len(self.airthing_devices)
+
+    def connect(self, mac, retries=1):  
+        tries = 0
+        self._dev = None
+        while (tries < retries):
+            tries += 1
+            try:
+                self._dev = btle.Peripheral(mac)
+            except Exception as e:
+                print(e)
+                if tries == retries:
+                    pass
+                else:
+                    print("Retrying")
+
+    def disconnect(self):
+        if self._dev is not None:
+            self._dev.disconnect()
+            self._dev = None
 
     def get_info(self):
         # Try to get some info from the discovered airthings devices
         self.devices = {}
 
         for mac in self.airthing_devices:
-            device = AirthingsDeviceInfo(serial_nr=mac)
-            try:
-                self.adapter.start(reset_on_start=False)
-                dev = self.adapter.connect(mac, 3)
+            self.connect(mac)
+            if self._dev is not None:
+                device = AirthingsDeviceInfo(serial_nr=mac)
                 for characteristic in device_info_characteristics:
-                    try:
-                        data = dev.char_read(characteristic.uuid)
-                        setattr(device, characteristic.name, data.decode(characteristic.format))
-                    except (BLEError, NotConnectedError, NotificationTimeout):
-                        _LOGGER.exception("")
-                dev.disconnect()
-            except (BLEError, NotConnectedError, NotificationTimeout):
-                _LOGGER.exception("")
-            self.adapter.stop()
-            self.devices[mac] = device
+                    char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
+                    data = char.read()
+                    setattr(device, characteristic.name, data.decode(characteristic.format))
 
+                self.devices[mac] = device
+            self.disconnect()
         return self.devices
 
     def get_sensors(self):
         self.sensors = {}
         for mac in self.airthing_devices:
-            try:
-                self.adapter.start(reset_on_start=False)
-                dev = self.adapter.connect(mac, 3)
-                characteristics = dev.discover_characteristics()
+            self.connect(mac)
+            if self._dev is not None:
+                characteristics = self._dev.getCharacteristics()
                 sensor_characteristics =  []
-                for characteristic in characteristics.values():
+                for characteristic in characteristics:
                     _LOGGER.debug(characteristic)
                     if characteristic.uuid in sensors_characteristics_uuid_str:
                         sensor_characteristics.append(characteristic)
                 self.sensors[mac] = sensor_characteristics
-            except (BLEError, NotConnectedError, NotificationTimeout):
-                _LOGGER.exception("Failed to discover sensors")
-
+            self.disconnect()
         return self.sensors
 
     def get_sensor_data(self):
         if time.monotonic() - self.last_scan > self.scan_interval:
             self.last_scan = time.monotonic()
             for mac, characteristics in self.sensors.items():
-                try:
-                    self.adapter.start(reset_on_start=False)
-                    dev = self.adapter.connect(mac, 3)
+                self.connect(mac)
+                if self._dev is not None:
                     for characteristic in characteristics:
-                        try:
-                            data = dev.char_read_handle("0x{:04x}".format(characteristic.handle))
-                            if characteristic.uuid in sensor_decoders:
-                                sensor_data = sensor_decoders[characteristic.uuid].decode_data(data)
-                                _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
-                                if self.sensordata.get(mac) is None:
-                                    self.sensordata[mac] = sensor_data
-                                else:
-                                    self.sensordata[mac].update(sensor_data)
-                        except (BLEError, NotConnectedError, NotificationTimeout):
-                            _LOGGER.exception("Failed to read characteristic")
-
-                    dev.disconnect()
-                except (BLEError, NotConnectedError, NotificationTimeout):
-                    _LOGGER.exception("Failed to connect")
-                self.adapter.stop()
+                        char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
+                        data = char.read()
+                        if str(characteristic.uuid) in sensor_decoders:
+                            sensor_data = sensor_decoders[str(characteristic.uuid)].decode_data(data)
+                            _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
+                            if self.sensordata.get(mac) is None:
+                                self.sensordata[mac] = sensor_data
+                            else:
+                                self.sensordata[mac].update(sensor_data)
+                self.disconnect()
 
         return self.sensordata
 
 
 if __name__ == "__main__":
     logging.basicConfig()
-    _LOGGER.setLevel(logging.INFO)
-    ad = AirthingsWaveDetect(180)
+    _LOGGER.setLevel(logging.DEBUG)
+    ad = AirthingsWaveDetect(0)
     num_dev_found = ad.find_devices()
     if num_dev_found > 0:
         devices = ad.get_info()
@@ -268,4 +262,3 @@ if __name__ == "__main__":
         for mac, data in sensordata.items():
             for name, val in data.items():
                 _LOGGER.info("{}: {}: {}".format(mac, name, val))
-
