@@ -147,10 +147,8 @@ class AirthingsWaveDetect:
         self.scan_interval = scan_interval
         self.last_scan = -1
 
-
     def _parse_serial_number(self, manufacturer_data):
         try:
-            #print(manufacturer_data)
             (ID, SN, _) = struct.unpack("<HLH", manufacturer_data)
         except Exception as e:  # Return None for non-Airthings devices
             return None
@@ -158,10 +156,12 @@ class AirthingsWaveDetect:
             if ID == 0x0334:
                 return SN
 
-    def find_devices(self, scanns=10):
+    def find_devices(self, scans=50, timeout=0.1):
+        # Search for devices, scan for BLE devices scans times for timeout seconds
+        # Get manufacturer data and try to match match it to airthings ID.
         scanner = btle.Scanner()
-        for _count in range(scanns):
-            advertisements = scanner.scan(0.1)
+        for _count in range(scans):
+            advertisements = scanner.scan(timeout)
             for adv in advertisements:
                 sn = self._parse_serial_number(adv.getValue(btle.ScanEntry.MANUFACTURER))
                 if sn is not None:
@@ -171,9 +171,9 @@ class AirthingsWaveDetect:
         _LOGGER.debug("Found {} airthings devices".format(len(self.airthing_devices)))
         return len(self.airthing_devices)
 
-    def connect(self, mac, retries=1):  
+    def connect(self, mac, retries=10):  
         tries = 0
-        self._dev = None
+        self.disconnect()
         while (tries < retries):
             tries += 1
             try:
@@ -183,7 +183,7 @@ class AirthingsWaveDetect:
                 if tries == retries:
                     pass
                 else:
-                    print("Retrying")
+                    _LOGGER.debug("Retrying {}".format(mac))
 
     def disconnect(self):
         if self._dev is not None:
@@ -193,7 +193,6 @@ class AirthingsWaveDetect:
     def get_info(self):
         # Try to get some info from the discovered airthings devices
         self.devices = {}
-
         for mac in self.airthing_devices:
             self.connect(mac)
             if self._dev is not None:
@@ -229,9 +228,9 @@ class AirthingsWaveDetect:
                 self.connect(mac)
                 if self._dev is not None:
                     for characteristic in characteristics:
-                        char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
-                        data = char.read()
                         if str(characteristic.uuid) in sensor_decoders:
+                            char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
+                            data = char.read()
                             sensor_data = sensor_decoders[str(characteristic.uuid)].decode_data(data)
                             _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
                             if self.sensordata.get(mac) is None:
