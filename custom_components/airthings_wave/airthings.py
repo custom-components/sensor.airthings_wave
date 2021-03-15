@@ -146,6 +146,7 @@ class AirthingsWaveDetect:
         self.sensordata = {}
         self.scan_interval = scan_interval
         self.last_scan = -1
+        self._dev = None
 
     def _parse_serial_number(self, manufacturer_data):
         try:
@@ -177,7 +178,7 @@ class AirthingsWaveDetect:
         while (tries < retries):
             tries += 1
             try:
-                self._dev = btle.Peripheral(mac)
+                self._dev = btle.Peripheral(mac.lower())
             except Exception as e:
                 print(e)
                 if tries == retries:
