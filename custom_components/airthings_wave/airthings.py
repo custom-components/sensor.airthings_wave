@@ -7,7 +7,6 @@ from datetime import datetime
 
 import bluepy.btle as btle
 
-
 from uuid import UUID
 
 _LOGGER = logging.getLogger(__name__)
@@ -199,9 +198,13 @@ class AirthingsWaveDetect:
             if self._dev is not None:
                 device = AirthingsDeviceInfo(serial_nr=mac)
                 for characteristic in device_info_characteristics:
-                    char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
-                    data = char.read()
-                    setattr(device, characteristic.name, data.decode(characteristic.format))
+                    try:
+                        char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
+                        data = char.read()
+                        setattr(device, characteristic.name, data.decode(characteristic.format))
+                    except btle.BTLEDisconnectError:
+                        _LOGGER.exception("Disconnected")
+                        self._dev = None
 
                 self.devices[mac] = device
             self.disconnect()
@@ -212,13 +215,17 @@ class AirthingsWaveDetect:
         for mac in self.airthing_devices:
             self.connect(mac)
             if self._dev is not None:
-                characteristics = self._dev.getCharacteristics()
-                sensor_characteristics =  []
-                for characteristic in characteristics:
-                    _LOGGER.debug(characteristic)
-                    if characteristic.uuid in sensors_characteristics_uuid_str:
-                        sensor_characteristics.append(characteristic)
-                self.sensors[mac] = sensor_characteristics
+                try:
+                    characteristics = self._dev.getCharacteristics()
+                    sensor_characteristics =  []
+                    for characteristic in characteristics:
+                        _LOGGER.debug(characteristic)
+                        if characteristic.uuid in sensors_characteristics_uuid_str:
+                            sensor_characteristics.append(characteristic)
+                    self.sensors[mac] = sensor_characteristics
+                except btle.BTLEDisconnectError:
+                        _LOGGER.exception("Disconnected")
+                        self._dev = None
             self.disconnect()
         return self.sensors
 
@@ -228,16 +235,20 @@ class AirthingsWaveDetect:
             for mac, characteristics in self.sensors.items():
                 self.connect(mac)
                 if self._dev is not None:
-                    for characteristic in characteristics:
-                        if str(characteristic.uuid) in sensor_decoders:
-                            char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
-                            data = char.read()
-                            sensor_data = sensor_decoders[str(characteristic.uuid)].decode_data(data)
-                            _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
-                            if self.sensordata.get(mac) is None:
-                                self.sensordata[mac] = sensor_data
-                            else:
-                                self.sensordata[mac].update(sensor_data)
+                    try:
+                        for characteristic in characteristics:
+                            if str(characteristic.uuid) in sensor_decoders:
+                                char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
+                                data = char.read()
+                                sensor_data = sensor_decoders[str(characteristic.uuid)].decode_data(data)
+                                _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
+                                if self.sensordata.get(mac) is None:
+                                    self.sensordata[mac] = sensor_data
+                                else:
+                                    self.sensordata[mac].update(sensor_data)
+                    except btle.BTLEDisconnectError:
+                        _LOGGER.exception("Disconnected")
+                        self._dev = None
                 self.disconnect()
 
         return self.sensordata
