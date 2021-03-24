@@ -194,17 +194,22 @@ class AirthingsWaveDetect:
         # Try to get some info from the discovered airthings devices
         self.devices = {}
         for mac in self.airthing_devices:
-            self.connect(mac)
-            if self._dev is not None:
-                device = AirthingsDeviceInfo(serial_nr=mac)
-                for characteristic in device_info_characteristics:
-                    try:
-                        char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
-                        data = char.read()
-                        setattr(device, characteristic.name, data.decode(characteristic.format))
-                    except btle.BTLEDisconnectError:
-                        _LOGGER.exception("Disconnected")
-                        self._dev = None
+            # Lets retry some times if we get disconnected.
+            # We retry in this function as this is will only be executed on setup to find devices and info.
+            for i in range(10):
+                self.connect(mac)
+                try:
+                    if self._dev is not None:
+                        device = AirthingsDeviceInfo(serial_nr=mac)
+                        for characteristic in device_info_characteristics:                
+                            char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
+                            data = char.read()
+                            setattr(device, characteristic.name, data.decode(characteristic.format))
+                        # Successful read, lets break the retry loop
+                        break
+                except btle.BTLEDisconnectError:
+                    _LOGGER.exception("Disconnected, try {}".format(i))
+                    self._dev = None
 
                 self.devices[mac] = device
             self.disconnect()
@@ -214,17 +219,20 @@ class AirthingsWaveDetect:
         self.sensors = {}
         for mac in self.airthing_devices:
             self.connect(mac)
-            if self._dev is not None:
-                try:
-                    characteristics = self._dev.getCharacteristics()
-                    sensor_characteristics =  []
-                    for characteristic in characteristics:
-                        _LOGGER.debug(characteristic)
-                        if characteristic.uuid in sensors_characteristics_uuid_str:
-                            sensor_characteristics.append(characteristic)
-                    self.sensors[mac] = sensor_characteristics
-                except btle.BTLEDisconnectError:
-                        _LOGGER.exception("Disconnected")
+            for i in range(10): #Retry if we fail to get sensor data, this will only be done on start.
+                if self._dev is not None:
+                    try:
+                        characteristics = self._dev.getCharacteristics()
+                        sensor_characteristics =  []
+                        for characteristic in characteristics:
+                            _LOGGER.debug(characteristic)
+                            if characteristic.uuid in sensors_characteristics_uuid_str:
+                                sensor_characteristics.append(characteristic)
+                        self.sensors[mac] = sensor_characteristics
+                        # We got all sensors, we are done.
+                        break
+                    except btle.BTLEDisconnectError:
+                        _LOGGER.exception("Disconnected, {}.".format(i))
                         self._dev = None
             self.disconnect()
         return self.sensors
@@ -247,7 +255,7 @@ class AirthingsWaveDetect:
                                 else:
                                     self.sensordata[mac].update(sensor_data)
                     except btle.BTLEDisconnectError:
-                        _LOGGER.exception("Disconnected")
+                        _LOGGER.exception("Disconnected, lets try again next time.")
                         self._dev = None
                 self.disconnect()
 
