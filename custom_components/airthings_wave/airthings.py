@@ -218,8 +218,8 @@ class AirthingsWaveDetect:
     def get_sensors(self):
         self.sensors = {}
         for mac in self.airthing_devices:
-            self.connect(mac)
             for i in range(10): #Retry if we fail to get sensor data, this will only be done on start.
+                self.connect(mac)
                 if self._dev is not None:
                     try:
                         characteristics = self._dev.getCharacteristics()
