@@ -183,7 +183,7 @@ class AirthingsWaveDetect:
                 if tries == retries:
                     pass
                 else:
-                    _LOGGER.debug("Retrying {}".format(mac))
+                    _LOGGER.debug("Retrying connect {}".format(mac))
 
     def disconnect(self):
         if self._dev is not None:
@@ -196,7 +196,7 @@ class AirthingsWaveDetect:
         for mac in self.airthing_devices:
             # Lets retry some times if we get disconnected.
             # We retry in this function as this is will only be executed on setup to find devices and info.
-            for i in range(10):
+            for retry in range(10):
                 self.connect(mac)
                 try:
                     if self._dev is not None:
@@ -208,8 +208,8 @@ class AirthingsWaveDetect:
                         # Successful read, lets break the retry loop
                         break
                 except btle.BTLEDisconnectError:
-                    _LOGGER.exception("Disconnected, try {}".format(i))
-                    self._dev = None
+                    _LOGGER.exception("Get info disconnected, retry: {}".format(retry))
+                    continue #Go directly to next retry loop.
 
                 self.devices[mac] = device
             self.disconnect()
@@ -218,7 +218,7 @@ class AirthingsWaveDetect:
     def get_sensors(self):
         self.sensors = {}
         for mac in self.airthing_devices:
-            for i in range(10): #Retry if we fail to get sensor data, this will only be done on start.
+            for retry in range(10): #Retry if we fail to get sensor data, this will only be done on start.
                 self.connect(mac)
                 if self._dev is not None:
                     try:
@@ -232,8 +232,7 @@ class AirthingsWaveDetect:
                         # We got all sensors, we are done.
                         break
                     except btle.BTLEDisconnectError:
-                        _LOGGER.exception("Disconnected, {}.".format(i))
-                        self._dev = None
+                        _LOGGER.exception("Get sensors disconnected, retry: {}.".format(retry))
             self.disconnect()
         return self.sensors
 
@@ -241,22 +240,22 @@ class AirthingsWaveDetect:
         if time.monotonic() - self.last_scan > self.scan_interval:
             self.last_scan = time.monotonic()
             for mac, characteristics in self.sensors.items():
-                self.connect(mac)
-                if self._dev is not None:
-                    try:
-                        for characteristic in characteristics:
-                            if str(characteristic.uuid) in sensor_decoders:
-                                char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
-                                data = char.read()
-                                sensor_data = sensor_decoders[str(characteristic.uuid)].decode_data(data)
-                                _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
-                                if self.sensordata.get(mac) is None:
-                                    self.sensordata[mac] = sensor_data
-                                else:
-                                    self.sensordata[mac].update(sensor_data)
-                    except btle.BTLEDisconnectError:
-                        _LOGGER.exception("Disconnected, lets try again next time.")
-                        self._dev = None
+                for retry in range(10):                
+                    self.connect(mac)
+                    if self._dev is not None:
+                        try:
+                            for characteristic in characteristics:
+                                if str(characteristic.uuid) in sensor_decoders:
+                                    char = self._dev.getCharacteristics(uuid=characteristic.uuid)[0]
+                                    data = char.read()
+                                    sensor_data = sensor_decoders[str(characteristic.uuid)].decode_data(data)
+                                    _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
+                                    if self.sensordata.get(mac) is None:
+                                        self.sensordata[mac] = sensor_data
+                                    else:
+                                        self.sensordata[mac].update(sensor_data)
+                        except btle.BTLEDisconnectError:
+                            _LOGGER.exception("Get sensor data disconnected, retry: {}.".format(retry))
                 self.disconnect()
 
         return self.sensordata
