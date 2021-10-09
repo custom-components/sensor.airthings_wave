@@ -178,6 +178,7 @@ class AirthingsWaveDetect:
             tries += 1
             try:
                 self._dev = btle.Peripheral(mac.lower())
+                break
             except Exception as e:
                 print(e)
                 if tries == retries:
