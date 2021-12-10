@@ -20,7 +20,13 @@ from .airthings import AirthingsWaveDetect
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-from homeassistant.components.sensor import PLATFORM_SCHEMA
+
+from homeassistant.components.sensor import (
+    PLATFORM_SCHEMA,
+    STATE_CLASS_MEASUREMENT,
+    SensorEntity,
+)
+
 from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  CONF_NAME, CONF_SCAN_INTERVAL, CONF_ELEVATION,
                                  CONF_UNIT_SYSTEM, CONF_UNIT_SYSTEM_IMPERIAL,
@@ -32,7 +38,6 @@ from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  DEVICE_CLASS_TIMESTAMP,
                                  EVENT_HOMEASSISTANT_STOP, ILLUMINANCE,
                                  STATE_UNKNOWN)
-from homeassistant.helpers.entity import Entity
 
 _LOGGER = logging.getLogger(__name__)
 CONNECT_TIMEOUT = 30
@@ -208,7 +213,10 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     add_entities(ha_entities, True)
 
 
-class AirthingsSensor(Entity):
+class AirthingsSensor(SensorEntity):
+
+    _attr_state_class = STATE_CLASS_MEASUREMENT
+
     """General Representation of an Airthings sensor."""
     def __init__(self, mac, name, device, device_info, sensor_specifics):
         """Initialize a sensor."""
