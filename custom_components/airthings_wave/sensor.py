@@ -260,7 +260,7 @@ class AirthingsSensor(SensorEntity):
         return self._name
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes of the sensor."""
         attributes = self._sensor_specifics.get_extra_attributes(self._state)
         try:
