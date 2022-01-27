@@ -61,15 +61,14 @@ sensor:
 
 ## Limitations
 
-It may be possible that the Wave must be connected to the official app at least
-once before you can use this program, so you will probably not get around
-registering an account with Airthings.
+Users has reported that it is possible to get data without first registering with the official app, 
+so it should be possible to use the sensor with this integration without registering.
 
 The radon level history stored on the Wave itself cannot be accessed
 with this component. To get around this, it connects regularly to the radon
 detector.
 
-Make sure you install the latest firmware on the device using the official app
+It might be beneficial to install the latest firmware on the device using the official app
 first.
 
 ## Known Issues
