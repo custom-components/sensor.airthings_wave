@@ -36,6 +36,8 @@ from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  DEVICE_CLASS_TEMPERATURE,
                                  DEVICE_CLASS_PRESSURE,
                                  DEVICE_CLASS_TIMESTAMP,
+                                 DEVICE_CLASS_BATTERY,
+                                 DEVICE_CLASS_VOLTAGE,
                                  EVENT_HOMEASSISTANT_STOP, ILLUMINANCE,
                                  STATE_UNKNOWN)
 
@@ -149,6 +151,8 @@ class RadonSensor(Sensor):
 
 
 DEVICE_SENSOR_SPECIFICS = { "date_time":Sensor('time', None, None, None),
+                            "battery":Sensor(PERCENT, None, DEVICE_CLASS_BATTERY, 'mdi:battery'),
+                            "voltage":Sensor('V', None, DEVICE_CLASS_VOLTAGE, None),
                             "temperature":Sensor(TEMP_CELSIUS, None, DEVICE_CLASS_TEMPERATURE, None),
                             "humidity": Sensor(PERCENT, None, DEVICE_CLASS_HUMIDITY, None),
                             "rel_atm_pressure": PressureSensor(ATM_METRIC_UNITS, None, DEVICE_CLASS_PRESSURE, None),
