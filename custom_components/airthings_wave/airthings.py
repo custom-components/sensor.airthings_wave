@@ -146,8 +146,8 @@ class CommandDecode:
             self.format_type,
             raw_data[2:])
         res = {}
-        res['ambientlight'] = val[2]
-        res['measurement_periods'] =  val[5]
+        #res['ambientlight'] = val[2]
+        #res['measurement_periods'] =  val[5]
         res['voltage'] = val[17] / 1000.0
 
         V_MAX=3.2
