@@ -1,7 +1,7 @@
 {
   "domain": "airthings_wave",
   "name": "Airthings Wave",
-  "version": "3.0.5",
+  "version": "3.1.0",
   "documentation": "https://github.com/custom-components/sensor.airthings_wave/",
   "issue_tracker": "https://github.com/custom-components/sensor.airthings_wave/issues",
   "dependencies": [],
