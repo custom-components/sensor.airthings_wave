@@ -136,12 +136,17 @@ class CommandDecode:
         self.format_type = format_type
         self.cmd = cmd
 
-    def decode_data(self, raw_data): 
+    def decode_data(self, raw_data):
+        if raw_data is None:
+            return {}
         cmd = raw_data[0:1]
         if cmd != self.cmd:
             _LOGGER.warning("Result for Wrong command received, expected {} got {}".format(self.cmd.hex(), cmd.hex()))
             return {}
-                
+        
+        if len(raw_data[2:]) != struct.calcsize(self.format_type):
+            _LOGGER.debug("Wrong length data received ({}) verses expected ({})".format(len(cmd), struct.calcsize(self.format_type)))
+            return {}
         val = struct.unpack(
             self.format_type,
             raw_data[2:])
