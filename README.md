@@ -43,6 +43,7 @@ sensor:
   - platform: airthings_wave
     scan_interval: 120
     elevation: 998
+    voltage_0: 2.2
 ```
 ### Optional Configuration Variables
 
@@ -58,6 +59,11 @@ sensor:
 
   (float)(Optional) The current elevation in meters. Used to correct the pressure sensor to sea level conditions.
 
+**voltage_100**
+  (float)(Optional) The voltage for 100% battery, calculated linearly between voltage_0 and voltage_100 (on supported device), default is 3.2
+
+**voltage_0**
+  (float)(Optional) The voltage for 0% battery, calculated linearly between voltage_0 and voltage_100 (on supported device), default is 2.2
 
 ## Limitations
 
@@ -70,6 +76,8 @@ detector.
 
 It might be beneficial to install the latest firmware on the device using the official app
 first.
+
+Battery level only works for the Airthings wave pluss device. 
 
 ## Known Issues
 

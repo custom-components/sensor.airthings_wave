@@ -153,11 +153,7 @@ class CommandDecode:
         res = {}
         #res['ambientlight'] = val[2]
         #res['measurement_periods'] =  val[5]
-        res['voltage'] = val[17] / 1000.0
-
-        V_MAX=3.2
-        V_MIN=2.2
-        res['battery']= max(0, min(100, round( (res['voltage']-V_MIN)/(V_MAX-V_MIN)*100)))
+        res['battery'] = val[17] / 1000.0
 
         return res
 
