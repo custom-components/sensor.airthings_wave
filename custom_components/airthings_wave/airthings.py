@@ -151,7 +151,7 @@ class CommandDecode:
             self.format_type,
             raw_data[2:])
         res = {}
-        #res['ambientlight'] = val[2]
+        res['illuminance'] = val[2]
         #res['measurement_periods'] =  val[5]
         res['battery'] = val[17] / 1000.0
 
