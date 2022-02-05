@@ -43,6 +43,8 @@ sensor:
   - platform: airthings_wave
     scan_interval: 120
     elevation: 998
+    voltage_100: 3.2
+    voltage_0: 2.2
 ```
 ### Optional Configuration Variables
 
@@ -58,19 +60,27 @@ sensor:
 
   (float)(Optional) The current elevation in meters. Used to correct the pressure sensor to sea level conditions.
 
+**voltage_100**
+
+  (float)(Optional) The voltage for 100% battery, calculated linearly between voltage_0 and voltage_100 (on supported device), default is 3.2
+
+**voltage_0**
+
+  (float)(Optional) The voltage for 0% battery, calculated linearly between voltage_0 and voltage_100 (on supported device), default is 2.2
 
 ## Limitations
 
-It may be possible that the Wave must be connected to the official app at least
-once before you can use this program, so you will probably not get around
-registering an account with Airthings.
+Users has reported that it is possible to get data without first registering with the official app, 
+so it should be possible to use the sensor with this integration without registering.
 
 The radon level history stored on the Wave itself cannot be accessed
 with this component. To get around this, it connects regularly to the radon
 detector.
 
-Make sure you install the latest firmware on the device using the official app
+It might be beneficial to install the latest firmware on the device using the official app
 first.
+
+Battery level only works for the Airthings wave pluss device. 
 
 ## Known Issues
 

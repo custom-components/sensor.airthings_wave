@@ -36,6 +36,9 @@ from homeassistant.const import (ATTR_DEVICE_CLASS, ATTR_ICON, CONF_MAC,
                                  DEVICE_CLASS_TEMPERATURE,
                                  DEVICE_CLASS_PRESSURE,
                                  DEVICE_CLASS_TIMESTAMP,
+                                 DEVICE_CLASS_BATTERY,
+                                 ATTR_VOLTAGE,
+                                 DEVICE_CLASS_VOLTAGE,
                                  EVENT_HOMEASSISTANT_STOP, ILLUMINANCE,
                                  STATE_UNKNOWN)
 
@@ -84,10 +87,15 @@ HIGH = [300, None, 'high']
 
 DOMAIN = 'airthings'
 
+CONF_VOLTAGE_100 = "voltage_100"
+CONF_VOLTAGE_0 = "voltage_0"
+
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_MAC, default=''): cv.string,
     vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
-    vol.Optional(CONF_ELEVATION, default=0): vol.Any(vol.Coerce(float), None)
+    vol.Optional(CONF_ELEVATION, default=0): vol.Any(vol.Coerce(float), None),
+    vol.Optional(CONF_VOLTAGE_100, default=3.2): vol.Any(vol.Coerce(float), None),
+    vol.Optional(CONF_VOLTAGE_0, default=2.2): vol.Any(vol.Coerce(float), None),
 })
 
 
@@ -148,7 +156,24 @@ class RadonSensor(Sensor):
         return {ATTR_RADON_LEVEL: radon_level}
 
 
+class BatterySensor(Sensor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.voltage = 0.0
+
+    def transform(self, value):
+        self.voltage = value
+        V_MAX=self.parameters[CONF_VOLTAGE_100] #3.2
+        V_MIN=self.parameters[CONF_VOLTAGE_0] #2.4
+        battery_level = max(0, min(100, round( (value-V_MIN)/(V_MAX-V_MIN)*100)))
+        return battery_level
+
+    def get_extra_attributes(self, data):
+        return {ATTR_VOLTAGE: self.voltage}
+
+
 DEVICE_SENSOR_SPECIFICS = { "date_time":Sensor('time', None, None, None),
+                            "battery":BatterySensor(PERCENT, None, DEVICE_CLASS_BATTERY, 'mdi:battery'),
                             "temperature":Sensor(TEMP_CELSIUS, None, DEVICE_CLASS_TEMPERATURE, None),
                             "humidity": Sensor(PERCENT, None, DEVICE_CLASS_HUMIDITY, None),
                             "rel_atm_pressure": PressureSensor(ATM_METRIC_UNITS, None, DEVICE_CLASS_PRESSURE, None),
@@ -170,6 +195,10 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     elevation = config.get(CONF_ELEVATION) or 0.0
     DEVICE_SENSOR_SPECIFICS["rel_atm_pressure"].set_parameters(
         {'elevation': elevation})
+
+    DEVICE_SENSOR_SPECIFICS["battery"].set_parameters(
+        {CONF_VOLTAGE_100: config.get(CONF_VOLTAGE_100),
+        CONF_VOLTAGE_0: config.get(CONF_VOLTAGE_0)})
 
     if not hass.config.units.is_metric:
         DEVICE_SENSOR_SPECIFICS["radon_1day_avg"].set_unit_scale(VOLUME_PICOCURIE, BQ_TO_PCI_MULTIPLIER)
