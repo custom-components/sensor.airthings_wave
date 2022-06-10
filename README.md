@@ -11,7 +11,9 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-hassio support for Airthings Wave, Airthings Wave Plus, and Airthings Wave Mini BLE environmental sensors.
+hassio support for Airthings Wave, Airthings Wave Plus, and Airthings Wave Mini BLE environmental sensors. 
+
+This component is cloudless and accomplishes this by communicating over bluetooth instead of using Airthings' cloud API.
 
 ![ScreenShot](ScreenShot.png)
 
