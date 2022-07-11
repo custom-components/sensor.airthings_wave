@@ -15,6 +15,7 @@ https://home-assistant.io/components/sensor.airthings_wave/
 import logging
 from datetime import timedelta
 from math import exp
+import asyncio
 
 from .airthings import AirthingsWaveDetect
 
@@ -209,7 +210,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     airthingsdetect = AirthingsWaveDetect(scan_interval, mac)
     try:
         if mac is None:
-            num_devices_found = airthingsdetect.find_devices()
+            num_devices_found = asyncio.run(airthingsdetect.find_devices())
             _LOGGER.info("Found {} airthings device(s)".format(num_devices_found))
 
         if mac is None and num_devices_found == 0:
@@ -217,19 +218,19 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             return
 
         _LOGGER.debug("Getting info about device(s)")
-        devices_info = airthingsdetect.get_info()
+        devices_info =  asyncio.run(airthingsdetect.get_info())
         for mac, dev in devices_info.items():
             _LOGGER.info("{}: {}".format(mac, dev))
 
         _LOGGER.debug("Getting sensors")
-        devices_sensors = airthingsdetect.get_sensors()
+        devices_sensors = asyncio.run(airthingsdetect.get_sensors())
         for mac, sensors in devices_sensors.items():
             for sensor in sensors:
                 _LOGGER.debug("{}: Found sensor UUID: {} Handle: {}".format(mac, sensor.uuid, sensor.handle))
 
         _LOGGER.debug("Get initial sensor data to populate HA entities")
         ha_entities = []
-        sensordata = airthingsdetect.get_sensor_data()
+        sensordata =  asyncio.run(airthingsdetect.get_sensor_data())
         for mac, data in sensordata.items():
             for name, val in data.items():
                 _LOGGER.debug("{}: {}: {}".format(mac, name, val))
