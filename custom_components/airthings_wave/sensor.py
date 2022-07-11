@@ -303,7 +303,7 @@ class AirthingsSensor(SensorEntity):
         """Fetch new state data for the sensor.
         This is the only method that should fetch new data for Home Assistant.
         """
-        self.device.get_sensor_data()
+        asyncio.run(self.device.get_sensor_data())
         value = self.device.sensordata[self._mac][self._sensor_name]
         self._state = self._sensor_specifics.transform(value)
         _LOGGER.debug("State {} {}".format(self._name, self._state))
