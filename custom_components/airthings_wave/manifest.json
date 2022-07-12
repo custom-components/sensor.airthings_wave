@@ -7,6 +7,6 @@
   "dependencies": [],
   "codeowners": ["@MartyTremblay","@sverrham"],
   "requirements": [
-    "bleak"
+    "bleak==0.14.3"
   ]
 }

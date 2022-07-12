@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Martin Tremblay
+# Copyright (c) 2021 Martin Tremblay, mjmccans
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -208,10 +208,10 @@ class AirthingsWaveDetect:
         self._dev = None
         self._command_data = None
 
-
     def notification_handler(self, sender, data):
         _LOGGER.debug("Notification handler: {0}: {1}".format(sender, data))
         self._command_data = data
+        self._event.set()
     
     async def find_devices(self, scans=2, timeout=5):
         # Search for devices, scan for BLE devices scans times for timeout seconds
@@ -221,7 +221,7 @@ class AirthingsWaveDetect:
         for _count in range(scans):
             advertisements = await BleakScanner.discover(timeout)
             for adv in advertisements:
-                if adv.metadata["manufacturer_data"] == {820: b'\xd6+\xa5\xaeI\x00'}: # TODO: Not sure if this is the best way to identify Airthings devices
+                if 820 in adv.metadata["manufacturer_data"]: # TODO: Not sure if this is the best way to identify Airthings devices
                     if adv.address not in self.airthing_devices:
                         self.airthing_devices.append(adv.address)
 
@@ -306,23 +306,19 @@ class AirthingsWaveDetect:
                                 sensor_data = sensor_decoders[str(characteristic.uuid)].decode_data(data)
                                 _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
                             
-                            # ToDo: Is there a more elegant way to handle the below?
-
                             if str(characteristic.uuid) in command_decoders:
                                 _LOGGER.debug("command characteristic: {}".format(characteristic.uuid))
+                                # Create an Event object.
+                                self._event = asyncio.Event()
                                 # Set up the notification handlers
                                 await self._dev.start_notify(characteristic.uuid, self.notification_handler)
                                 # send command to this 'indicate' characteristic
                                 await self._dev.write_gatt_char(characteristic.uuid, command_decoders[str(characteristic.uuid)].cmd)
                                 # Wait for up to one second to see if a callblack comes in.
-                                for i in range(10):
-                                    await asyncio.sleep(0.1)
-                                    # Check if there is data
-                                    _LOGGER.debug("waiting for callback: {}".format(i))
-                                    if self._command_data != None:
-                                        sensor_data = command_decoders[str(characteristic.uuid)].decode_data(self._command_data)
-                                        self._command_data = None
-                                        break
+                                await self._event.wait()
+                                if self._command_data is not None:
+                                    sensor_data = command_decoders[str(characteristic.uuid)].decode_data(self._command_data)
+                                    self._command_data = None
                                 # Stop notification handler
                                 await self._dev.stop_notify(characteristic.uuid)
 
