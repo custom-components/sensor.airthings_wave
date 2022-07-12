@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Martin Tremblay, mjmccans
+# Copyright (c) 2021 Martin Tremblay, Mark McCans
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -315,7 +315,10 @@ class AirthingsWaveDetect:
                                 # send command to this 'indicate' characteristic
                                 await self._dev.write_gatt_char(characteristic.uuid, command_decoders[str(characteristic.uuid)].cmd)
                                 # Wait for up to one second to see if a callblack comes in.
-                                await self._event.wait()
+                                try:
+                                    await asyncio.wait_for(self._event.wait(), 1)
+                                except asyncio.TimeoutError:
+                                    _LOGGER.warn("Timeout getting command data.")
                                 if self._command_data is not None:
                                     sensor_data = command_decoders[str(characteristic.uuid)].decode_data(self._command_data)
                                     self._command_data = None
