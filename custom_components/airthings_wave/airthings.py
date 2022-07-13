@@ -239,7 +239,7 @@ class AirthingsWaveDetect:
                 ret = await self._dev.connect()
                 if ret:
                     _LOGGER.debug("Connected to {}".format(mac))
-                break
+                    break
             except Exception as e:
                 if tries == retries:
                     _LOGGER.info("Not able to connect to {}".format(mac))
