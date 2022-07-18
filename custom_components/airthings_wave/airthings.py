@@ -251,90 +251,104 @@ class AirthingsWaveDetect:
         if self._dev is not None:
             await self._dev.disconnect()
             self._dev = None
+            _LOGGER.debug("Disconnected.")
 
     async def get_info(self):
         # Try to get some info from the discovered airthings devices
         self.devices = {}
         for mac in self.airthing_devices:
-            await self.connect(mac)
-            if self._dev is not None and self._dev.is_connected:
-                try:   
-                    if self._dev is not None and self._dev.is_connected:
-                        device = AirthingsDeviceInfo(serial_nr=mac)
-                        for characteristic in device_info_characteristics:
-                            try:
-                                data = await self._dev.read_gatt_char(characteristic.uuid)
-                                setattr(device, characteristic.name, data.decode(characteristic.format))
-                            except:
-                                _LOGGER.exception("Error getting info")
-                                self._dev = None
-                    self.devices[mac] = device    
-                except:
-                    _LOGGER.exception("Error getting device info.")
+            _LOGGER.debug("Getting device info for {}".format(mac))
+            try:
+                await self.connect(mac)
+                if self._dev is not None and self._dev.is_connected:
+                    device = AirthingsDeviceInfo(serial_nr=mac)
+                    for characteristic in device_info_characteristics:
+                        try:
+                            data = await self._dev.read_gatt_char(characteristic.uuid)
+                            setattr(device, characteristic.name, data.decode(characteristic.format))
+                        except:
+                            _LOGGER.exception("Error getting info")
+                    self.devices[mac] = device
+                else:
+                    raise "Could not connect to {}".format(mac)
+            except Exception as e:
+                _LOGGER.exception("Error getting device info for {}: {}".format(mac, e))
+            finally:
                 await self.disconnect()
-            else:
-                _LOGGER.error("Not getting device info because failed to connect to device.")
+            
         return self.devices
 
     async def get_sensors(self):
         self.sensors = {}
         for mac in self.airthing_devices:
-            await self.connect(mac)
-            if self._dev is not None and self._dev.is_connected:
-                sensor_characteristics =  []
-                svcs = await self._dev.get_services()
-                for service in svcs:
-                    for characteristic in service.characteristics:
-                        _LOGGER.debug(characteristic)
-                        if characteristic.uuid in sensors_characteristics_uuid_str:
-                            sensor_characteristics.append(characteristic)
-                self.sensors[mac] = sensor_characteristics
-            await self.disconnect()                            
+            _LOGGER.debug("Getting sensors for {}".format(mac))
+            try:
+                await self.connect(mac)
+                if self._dev is not None and self._dev.is_connected:
+                    sensor_characteristics =  []
+                    svcs = await self._dev.get_services()
+                    for service in svcs:
+                        for characteristic in service.characteristics:
+                            _LOGGER.debug(characteristic)
+                            if characteristic.uuid in sensors_characteristics_uuid_str:
+                                sensor_characteristics.append(characteristic)
+                    self.sensors[mac] = sensor_characteristics
+                else:
+                    raise "Could not connect to {}".format(mac)
+            except Exception as e:
+                _LOGGER.exception("Error getting sensors for {}: {}".format(mac, e))
+            finally:
+                await self.disconnect()                            
+        
         return self.sensors
 
     async def get_sensor_data(self):
         if time.monotonic() - self.last_scan > self.scan_interval or self.last_scan == -1:
             self.last_scan = time.monotonic()
             for mac, characteristics in self.sensors.items():
-                await self.connect(mac)
-                if self._dev is not None and self._dev.is_connected:
-                    try:
-                        for characteristic in characteristics:
-                            sensor_data = None
-                            if str(characteristic.uuid) in sensor_decoders:
-                                data = await self._dev.read_gatt_char(characteristic.uuid)
-                                sensor_data = sensor_decoders[str(characteristic.uuid)].decode_data(data)
-                                _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
-                            
-                            if str(characteristic.uuid) in command_decoders:
-                                _LOGGER.debug("command characteristic: {}".format(characteristic.uuid))
-                                # Create an Event object.
-                                self._event = asyncio.Event()
-                                # Set up the notification handlers
-                                await self._dev.start_notify(characteristic.uuid, self.notification_handler)
-                                # send command to this 'indicate' characteristic
-                                await self._dev.write_gatt_char(characteristic.uuid, command_decoders[str(characteristic.uuid)].cmd)
-                                # Wait for up to one second to see if a callblack comes in.
-                                try:
-                                    await asyncio.wait_for(self._event.wait(), 1)
-                                except asyncio.TimeoutError:
-                                    _LOGGER.warn("Timeout getting command data.")
-                                if self._command_data is not None:
-                                    sensor_data = command_decoders[str(characteristic.uuid)].decode_data(self._command_data)
-                                    self._command_data = None
-                                # Stop notification handler
-                                await self._dev.stop_notify(characteristic.uuid)
+                _LOGGER.debug("Getting sensor data for {}".format(mac))
+                try:
+                    await self.connect(mac)
+                    if self._dev is not None and self._dev.is_connected:
+                    
+                            for characteristic in characteristics:
+                                sensor_data = None
+                                if str(characteristic.uuid) in sensor_decoders:
+                                    data = await self._dev.read_gatt_char(characteristic.uuid)
+                                    sensor_data = sensor_decoders[str(characteristic.uuid)].decode_data(data)
+                                    _LOGGER.debug("{} Got sensordata {}".format(mac, sensor_data))
+                                
+                                if str(characteristic.uuid) in command_decoders:
+                                    _LOGGER.debug("command characteristic: {}".format(characteristic.uuid))
+                                    # Create an Event object.
+                                    self._event = asyncio.Event()
+                                    # Set up the notification handlers
+                                    await self._dev.start_notify(characteristic.uuid, self.notification_handler)
+                                    # send command to this 'indicate' characteristic
+                                    await self._dev.write_gatt_char(characteristic.uuid, command_decoders[str(characteristic.uuid)].cmd)
+                                    # Wait for up to one second to see if a callblack comes in.
+                                    try:
+                                        await asyncio.wait_for(self._event.wait(), 1)
+                                    except asyncio.TimeoutError:
+                                        _LOGGER.warn("Timeout getting command data.")
+                                    if self._command_data is not None:
+                                        sensor_data = command_decoders[str(characteristic.uuid)].decode_data(self._command_data)
+                                        self._command_data = None
+                                    # Stop notification handler
+                                    await self._dev.stop_notify(characteristic.uuid)
 
-                            if sensor_data is not None:
-                                if self.sensordata.get(mac) is None:
-                                    self.sensordata[mac] = sensor_data
-                                else:
-                                    self.sensordata[mac].update(sensor_data)                
-                    except:
-                        _LOGGER.exception("Error getting sensor data.")
-                        self._dev = None
-
-                await self.disconnect()
+                                if sensor_data is not None:
+                                    if self.sensordata.get(mac) is None:
+                                        self.sensordata[mac] = sensor_data
+                                    else:
+                                        self.sensordata[mac].update(sensor_data)      
+                    else:
+                        raise "Could not connect to {}".format(mac)        
+                except Exception as e:
+                    _LOGGER.exception("Error getting sensor data for '{}': {}".format(mac, e))
+                
+                finally:
+                    await self.disconnect()
 
         return self.sensordata
 
