@@ -270,7 +270,7 @@ class AirthingsWaveDetect:
                             _LOGGER.exception("Error getting info")
                     self.devices[mac] = device
                 else:
-                    raise "Could not connect to {}".format(mac)
+                    raise Exception("Could not connect to {}".format(mac))
             except Exception as e:
                 _LOGGER.exception("Error getting device info for {}: {}".format(mac, e))
             finally:
@@ -294,7 +294,7 @@ class AirthingsWaveDetect:
                                 sensor_characteristics.append(characteristic)
                     self.sensors[mac] = sensor_characteristics
                 else:
-                    raise "Could not connect to {}".format(mac)
+                    raise Exception("Could not connect to {}".format(mac))
             except Exception as e:
                 _LOGGER.exception("Error getting sensors for {}: {}".format(mac, e))
             finally:
@@ -343,7 +343,7 @@ class AirthingsWaveDetect:
                                     else:
                                         self.sensordata[mac].update(sensor_data)      
                     else:
-                        raise "Could not connect to {}".format(mac)        
+                        raise Exception("Could not connect to {}".format(mac))    
                 except Exception as e:
                     _LOGGER.exception("Error getting sensor data for '{}': {}".format(mac, e))
                 
