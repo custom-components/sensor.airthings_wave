@@ -1,15 +1,12 @@
 # sensor.airthings_wave
-[![GitHub Release][releases-shield]][releases]
-[![GitHub Activity][commits-shield]][commits]
-[![custom_updater][customupdaterbadge]][customupdater]
-[![License][license-shield]](LICENSE.md)
 
-![Project Maintenance][maintenance-shield]
-[![BuyMeCoffee][buymecoffeebadge]][buymecoffee]
-[![BuyMeCoffee][buymebeerbadge]][buymebeer]
+# Great news! This HACS component is now deprecated and retired and has been replaced by the official [Airthings BLE integration](https://www.home-assistant.io/integrations/airthings_ble/)
 
-[![Discord][discord-shield]][discord]
-[![Community Forum][forum-shield]][forum]
+Please remove this integration and use the official one in it's place
+
+A big thank you to everyone who have helped support this integration, and a thank you to @vincegio for porting it into the official Home Assistant repository.
+
+***
 
 hassio support for Airthings Wave, Airthings Wave Plus, and Airthings Wave Mini BLE environmental sensors. 
 
