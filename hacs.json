@@ -1,5 +1,5 @@
 {
   "name": "Airthings Wave",
   "domains": [ "sensor" ],  
-  "render_readme": true,
+  "render_readme": true
 }
